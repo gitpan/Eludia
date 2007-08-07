@@ -423,7 +423,7 @@ sub sql_select_vocabulary {
 
 	my ($table_name, $options) = @_;	
 	
-	$options -> {order} ||= 'label';
+	$options -> {order} ||= '2';
 	
 	my $filter = '1=1';
 	my $limit  = '';
@@ -460,8 +460,14 @@ sub sql_select_vocabulary {
 	}
 	
 	$limit = "LIMIT $options->{limit}" if $options -> {limit};
-	
-	return sql_select_all ("SELECT id, label FROM $table_name WHERE $filter ORDER BY $$options{order} $limit");
+
+	$options -> {label} ||= 'label';
+	if ($options -> {label} ne 'label') {
+		$options -> {label} =~ s/ AS.*//i;
+		$options -> {label} .= ' AS label';
+	}
+		
+	return sql_select_all ("SELECT id, $$options{label} FROM $table_name WHERE $filter ORDER BY $$options{order} $limit");
 	
 }
 
@@ -661,11 +667,7 @@ sub sql_undo_relink {
 	
 	ref $old_ids eq ARRAY or $old_ids = [$old_ids];
 			
-warn Dumper ($DB_MODEL -> {tables} -> {$table_name});
-warn Dumper ($DB_MODEL -> {tables} -> {$table_name} -> {references});
-
 	foreach my $old_id (@$old_ids) {
-	
 warn "undo relink $table_name: $old_id";
 
 		my $record = sql_select_hash ($table_name, $old_id);
@@ -680,7 +682,6 @@ warn "undo relink $table_name: $old_id";
 					AND column_name = '$$column_def{name}'
 					AND id_to = $old_id
 EOS
-
 			my $ids = sql_select_ids ("SELECT id_from $from");
 			sql_do ("DELETE $from");
 
@@ -690,8 +691,8 @@ warn "undo relink $$column_def{table_name} ($$column_def{name}): $old_id";
 				sql_do ("UPDATE $$column_def{table_name} SET $$column_def{name} = ? WHERE id IN ($ids)", $old_id);
 			}
 			else {			
-				$old_id = $old_id . ',';
-				sql_do ("UPDATE $$column_def{table_name} SET $$column_def{name} = CONCAT($$column_def{name}, ?) WHERE id IN ($ids)", $old_id);
+				$old_id_ = $old_id . ',';
+				sql_do ("UPDATE $$column_def{table_name} SET $$column_def{name} = CONCAT($$column_def{name}, ?) WHERE id IN ($ids)", $old_id_);
 			}
 
 		}

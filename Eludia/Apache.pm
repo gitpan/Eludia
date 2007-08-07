@@ -72,7 +72,7 @@ sub handler {
 
 	$_REQUEST {__windows_ce} = $r -> headers_in -> {'User-Agent'} =~ /Windows CE/ ? 1 : undef;
 	if ($_REQUEST {fake}) {
-    	    $_REQUEST {fake} =~ s/\%(25)*2c/,/i;
+    	    $_REQUEST {fake} =~ s/\%(25)*2c/,/ig;
 	}
 
 	if ($_REQUEST {action}) {
@@ -275,6 +275,8 @@ EOH
 			$_SUBSET -> {name} ||= $_SUBSET -> {items} -> [0] -> {name} if $n > 0;
 
 			$_SUBSET -> {name} eq $_USER -> {subset} or sql_do ('UPDATE users SET subset = ? WHERE id = ?', $_SUBSET -> {name}, $_USER -> {id});
+
+			*{$_SKIN . '::_SUBSET'}    = *{$_PACKAGE . '_SUBSET'};
 			
 		}
 
@@ -458,7 +460,10 @@ EOH
    
 #   	$db -> disconnect;
 
-	CORE::exit (0) if $_REQUEST {__sucide};
+	if ($_REQUEST {__suicide}) {
+		$r -> print (' ' x 8096);
+		CORE::exit (0);
+	}
 	
 	return OK;
 

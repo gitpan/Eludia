@@ -1,5 +1,7 @@
 package Eludia::Presentation::Skins::TurboMilk;
 
+use Data::Dumper;
+
 BEGIN {
 	require Eludia::Presentation::Skins::Generic;
 	delete $INC {"Eludia/Presentation/Skins/Generic.pm"};
@@ -87,7 +89,9 @@ sub draw_auth_toolbar {
 
 	my $logout_url = $conf -> {exit_url} || create_url (type => '_logout', id => '');
 
-	my ($header, $header_height, $header_prefix, $subset_div, $subset_div, $subset_cell);
+	my ($header, $header_height, $logo_url, $subset_div, $subset_div, $subset_cell);
+	
+	my $header_prefix = 'out';
 	
 	if ($_USER -> {id}) {
 	
@@ -111,18 +115,18 @@ EOH
 					$subset_cell = <<EOH;
 						<td width="5" align="center"><img src="$_REQUEST{__static_url}/vline.gif?$_REQUEST{__static_salt}" width="2px" height="28px"></td>
 						<td><img src="images/0.gif" border="0" hspace="0" width=5 height=1></td>
-						<td><div id="admin" onClick="subsets_are_visible = 1 - subsets_are_visible"><a href="#">$$item{label}</a></div></td>
+						<td><div id="admin" onClick="subsets_are_visible = 1 - subsets_are_visible; document.getElementById ('_body_iframe').contentWindow.subsets_are_visible = subsets_are_visible"><a href="#">$$item{label}</a></div></td>
 EOH
 				
 				}
-				else {
+#				else {
 				
 					my $class = $i == @{$_SKIN -> {subset} -> {items}} - 1 ? 'mm0' : 'mm';
 
 					$subset_div .= <<EOH;
-						<tr><td class="$class"><a href="$href&__subset=$$item{name}">$$item{label}</a></td></tr>
+						<tr @{[$item -> {name} eq $_SKIN -> {subset} -> {name} ? 'style="display: none"' : '']} id="_subset_tr_$$item{name}"><td class="$class"><a id="_subset_a_$$item{name}" onClick="subset_on_change('$$item{name}', '$href&__subset=$$item{name}')" href="#">$$item{label}</a></td></tr>
 EOH
-				}
+#				}
 			
 			}
 			
@@ -136,7 +140,7 @@ EOH
 
 		my $calendar = draw_calendar ();
 		$header_height = 48;
-		$header_prefix = '2';
+		$header_prefix = 'in';
 
 		$header = <<EOU;
 
@@ -155,7 +159,6 @@ EOH
 EOU
 	} elsif ($$conf{logon_hint}) {
 		$header_height = 90;
-		$header_prefix = '';
 
 		$header = <<EOH;
 			<td><table border=0 cellspacing=0 cellpadding=0>
@@ -170,15 +173,14 @@ EOU
 EOH
 	} else {
 		$header_height = 90;
-		$header_prefix = '';
 	}
 	return <<EOH;
 		$subset_div
-		<table cellSpacing=0 cellPadding=0 width="100%" border=0 bgcolor="#e5e5e5" background="$_REQUEST{__static_url}/bg$header_prefix.gif?$_REQUEST{__static_salt}" style="background-repeat: repeat-x">
+		<table id="logo_table" cellSpacing=0 cellPadding=0 width="100%" border=0 bgcolor="#e5e5e5" background="/i/bg_logo_$header_prefix.gif" style="background-repeat: repeat-x">
 			<tr>
 			<td width="20"><img src="$_REQUEST{__static_url}/0.gif?$_REQUEST{__static_salt}" width=20 height=$header_height border=0></td>
 			<td width=1><table border=0 valign="middle" border=0><tr>
-				<td valign="top" width=1><img src="$_REQUEST{__static_url}/eludia$header_prefix.gif?$_REQUEST{__static_salt}" border="0"></td>
+				<td valign="top" width=1><img src="/i/logo_$header_prefix.gif" border="0"></td>
 				<td width=1><img src="$_REQUEST{__static_url}/0.gif?$_REQUEST{__static_salt}" width=10 height=1 border=0></td>
 				<td width=1 valign="bottom" style='padding-bottom: 5px;'><img src="$_REQUEST{__static_url}/gsep.gif?$_REQUEST{__static_salt}" width="4" height="21"></td>
 				<td align="left" valign="middle" class='header_0' width=1><nobr>&nbsp;$$conf{page_title}</nobr></td>
@@ -186,10 +188,7 @@ EOH
 
 			$header
 			<td width="20px" align="right">&nbsp;</td></tr>
-		  </table>
-
-			$$options{top_banner}
-
+		 </table>
 EOH
 
 
@@ -1862,6 +1861,64 @@ EOH
 	
 	$_REQUEST {__select_rows} += 0;
 							
+	my $parameters = ${$_PACKAGE . 'apr'} -> parms;
+  
+	my $body = '';
+	my $onKeyDown = '';	
+	my $body_scroll = 'yes';
+	
+	if (!$_USER -> {id}) {
+		
+		$body = $page -> {body};
+		$body_scroll = 'no';
+		$$page{auth_toolbar} = '';
+		
+	}
+	elsif ($parameters -> {__subset} || $parameters -> {type}) {
+	
+		$$page{auth_toolbar} = '';
+		
+		$body = $page -> {menu} . $page -> {body};
+		
+		$onKeyDown = <<EOJS;
+		
+			if (window.event.keyCode == 88 && window.event.altKey) {
+				window.parent.document.location.href = '$_REQUEST{__uri}?type=_logout&sid=$_REQUEST{sid}&salt=@{[rand]}';
+				blockEvent ();
+			}
+			
+			handle_basic_navigation_keys ();
+			
+EOJS
+		
+		foreach (@{$page -> {scan2names}}) {
+
+			$onKeyDown .= &{"handle_hotkey_$$_{type}"} ($_);
+			$onKeyDown .= ';';
+
+		}
+
+	}
+	else {
+	
+		my $href = create_url (__subset => $_SUBSET -> {name});
+		$body_scroll = 'no';
+		$_REQUEST {__no_focus} = 1;
+		
+		$body = <<EOIFRAME;
+			<div id="body_iframe_div">
+				<iframe name='_body_iframe' id='_body_iframe' src="$href" width=100% height=100% border=0 frameborder=0 marginheight=0 marginwidth=0>
+				</iframe>
+			</div>
+			
+EOIFRAME
+
+	}
+	
+	if ($$page{auth_toolbar}) {
+		$$page{auth_toolbar} = "<tr height=48><td height=48>$$page{auth_toolbar}</td></tr>";
+	}
+	
 	return <<EOH;
 		<html>		
 			<head>
@@ -2054,35 +2111,46 @@ EOF
 					
 					}
 					
+          function subset_on_change (subset_name, href) {
+          
+            var subset_tr_id = '_subset_tr_' + subset_name;
+            var subset_a_id = '_subset_a_' + subset_name;
+
+            var subset_tr = document.getElementById(subset_tr_id);
+
+            var subset_table = subset_tr.parentElement;
+            
+            for (var i = 0; i < subset_table.rows.length; i++) {
+              subset_table.rows(i).style.display = '';
+            }
+
+            subset_tr.style.display = 'none';
+
+            var subset_label_div = document.getElementById('admin');
+
+            var label = document.getElementById(subset_a_id).innerHTML; 
+
+            var subset_label = document.createTextNode(label);
+            
+            var subset_label_a = document.createElement("A");
+
+            subset_label_a.appendChild(subset_label);
+
+            subset_label_a.href = '#';
+
+            subset_label_div.replaceChild(subset_label_a, subset_label_div.firstChild);
+
+            var fname = document.getElementById('_body_iframe');
+            fname.src = href;
+            
+            subsets_are_visible = 1 - subsets_are_visible;
+
+            document.getElementById ("_body_iframe").contentWindow.subsets_are_visible = subsets_are_visible;
+          
+          }
+
 					
 				</script>
-				
-			</head>
-			<body 
-				bgcolor=white 
-				leftMargin=0 
-				topMargin=0 
-				marginwidth=0 
-				marginheight=0 
-				name="body" 
-				id="body"
-				scroll="auto"
-				onload= "body_on_load (); try {StartClock ()} catch (e) {}"
-				onbeforeunload="document.body.style.cursor = 'wait'"
-				onunload=" try {KillClock ()} catch (e) {}"
-				onkeydown="
-				
-					if (window.event.keyCode == 88 && window.event.altKey) {
-						document.location.href = '$_REQUEST{__uri}?type=_logout&sid=$_REQUEST{sid}&salt=@{[rand]}';
-						blockEvent ();
-					}
-					
-					handle_basic_navigation_keys ();
-					
-					@{[ map {&{"handle_hotkey_$$_{type}"} ($_)} @{$page->{scan2names}} ]}
-					
-				"						
-			>
 				
 				@{[ $_REQUEST{__help_url} ? <<EOHELP : '' ]}
 					<script for="body" event="onhelp">
@@ -2090,16 +2158,38 @@ EOF
 						event.returnValue = false;
 					</script>						
 EOHELP
+
+			</head>
+			<body 
+				bgcolor=white 
+				leftMargin=0 
+				topMargin=0
+				bottomMargin=0
+				rightMargin=0
+				marginwidth=0 
+				marginheight=0 
+				scroll=$body_scroll
+				name="body" 
+				id="body"
+				scroll="auto"
+				onload= "body_on_load (); try {StartClock ()} catch (e) {}"
+				onbeforeunload="document.body.style.cursor = 'wait'"
+				onunload=" try {KillClock ()} catch (e) {}"
+				onkeydown="$onKeyDown"						
+			>
 				
-				<div id="bodyArea" _style='height:100%; padding:0px; margin:0px'>
+				<table id="body_table" cellspacing=0 cellpadding=0 border=0 width=100% height=100%>
+					$$page{auth_toolbar}
+					<tr><td valign=top height=100%>
+						$body
+					</td></tr>
+				</table>
+
 @{[ map {<<EOI} @{$_REQUEST{__invisibles}} ]}
 					<iframe name='$_' src="/i/0.html" width=0 height=0 application="yes" style="display:none">
 					</iframe>
 EOI
-					$$page{auth_toolbar}
-					$$page{menu}
-					$$page{body}
-				</div>				
+
 			</body>
 		</html>
 EOH
@@ -2238,5 +2328,98 @@ sub lrt_finish {
 EOH
 
 }
+
+################################################################################
+
+sub draw_logon_form {
+
+	return <<EOH;
+
+<table border="0" cellpadding="0" cellspacing="0" align=center height=100% width=100%>
+
+	<tr>
+
+		<td valign=top height=90>
+			<table id="logo_table" cellSpacing=0 cellPadding=0 width="100%" border=0 bgcolor="#e5e5e5" background="/i/bg_logo_out.gif" style="background-repeat: repeat-x" height=90>
+				<tr>
+				<td width="20"><img src="$_REQUEST{__static_url}/0.gif?$_REQUEST{__static_salt}" width=20 height=90 border=0></td>
+				<td width=1><table border=0 valign="middle" border=0><tr>
+					<td valign="top" width=1><img src="/i/logo_out.gif" border="0"></td>
+					<td width=1><img src="$_REQUEST{__static_url}/0.gif?$_REQUEST{__static_salt}" width=10 height=1 border=0></td>
+					<td width=1 valign="bottom" style='padding-bottom: 5px;'><img src="$_REQUEST{__static_url}/gsep.gif?$_REQUEST{__static_salt}" width="4" height="21"></td>
+					<td align="left" valign="middle" class='header_0' width=1><nobr>&nbsp;$$conf{page_title}</nobr></td>
+				</tr></table></td>				
+				
+				<td width="20px" align="right">&nbsp;</td></tr>
+			</table>
+
+		</td>
+
+	</tr>
+	
+	<tr>
+	
+		<td align=center valign=middle>
+
+			<table border="0" cellpadding="4" cellspacing="1" width="470" height="225" bgcolor="#EAEAF0" class="logon">
+				<tr><td class="login-head">Авторизация</td></tr>
+				<tr>
+					<td bgcolor="#F9F9FF" align="center" style="border-bottom:solid 1px #9AA0A3; height:150px;">
+						
+					
+						<table border="0" cellpadding="8" cellspacing="0">
+						<form action=/ method=post autocomplete="off" name=form>
+							<input type=hidden name=type value=logon>
+							<input type=hidden name=action value=execute>
+							<input type=hidden name=redirect_params value="$_REQUEST{redirect_params}">
+<!--							
+							<tr>
+								<td colspan="2" align="center"><a id="logon_url" style="text-decoration:none" href="javascript: document.forms['form'].elements['action'].value='execute_ip'; document.forms['form'].submit()"><div class="green-title"><div style="float:left;margin-top:6px;">Войти как Овсянко Дмитрий Евгеньевич</div><div style="float:right;"><img src="/i/logon_turbo_milk/images/green_ear_right.gif" border="0"></div></div></td>
+							</tr>
+-->							
+							<tr class="logon">
+								<td><b>Логин:</b></td>
+								<td><input type="text" name="login" style="width:200px;" onfocus="q_is_focused = true" onblur="q_is_focused = false" onKeyPress="if (window.event.keyCode == 13) form.password.focus ()"></td>
+							</tr>
+							<tr class="logon">
+								<td><b>Пароль:</b></td>
+								<td><input type="password" name="password" style="width:200px;" onfocus="q_is_focused = true" onblur="q_is_focused = false" onKeyPress="if (window.event.keyCode == 13) form.submit ()"></td>
+							</tr>
+							
+							
+						</form>
+						</table>
+					</td>
+				</tr>
+				<tr>
+					<td class="submit-area">						
+						<div class="grey-submit">
+							<div style="float:left;margin-top:5px;"><a href="#"><img src="$_REQUEST{__static_url}/i_logon.gif?$_REQUEST{__static_salt}" border="0" align="left" hspace="5"></a><a href="javascript:document.forms['form'].submit()">Войти в систему</a></div>
+							<div style="float:right;"><img src="$_REQUEST{__static_url}/grey_ear_right.gif?$_REQUEST{__static_salt}" border="0"></div>
+						</div>
+					</td>
+				</tr>
+			</table>
+			
+			
+		</td>
+		
+
+		
+	</tr>
+	<tr>
+		<td valign=top height=90>
+			<img src="$_REQUEST{__static_url}/0.gif?$_REQUEST{__static_salt}" width=20 height=90 border=0>
+		</td>
+	</tr>
+	
+</table>
+
+EOH
+
+}
+
+
+
 
 1;

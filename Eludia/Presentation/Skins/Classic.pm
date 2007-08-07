@@ -277,8 +277,8 @@ sub _draw_input_datetime {
 			$size 
 			$attributes 
 			autocomplete="off" 
-			onFocus="scrollable_table_is_blocked = true; q_is_focused = true; this.select()" 
-			onBlur="scrollable_table_is_blocked = false; q_is_focused = false" 
+			onFocus="scrollable_table_is_blocked = true; this.select()" 
+			onBlur="scrollable_table_is_blocked = false; " 
 			onKeyPress="$$options{onKeyPress}" 
 			onKeyDown="$$options{onKeyDown}"
 		>
@@ -540,7 +540,7 @@ sub draw_form_field_button {
 sub draw_form_field_string {
 	my ($_SKIN, $options, $data) = @_;
 	$options -> {attributes} -> {class} ||= 'form-active-inputs';
-	return '<input type="text"' . dump_attributes ($options -> {attributes}) . ' onKeyPress="if (window.event.keyCode != 27) is_dirty=true" onKeyDown="tabOnEnter()" onFocus="scrollable_table_is_blocked = true; q_is_focused = true" onBlur="scrollable_table_is_blocked = false; q_is_focused = false">';
+	return '<input type="text"' . dump_attributes ($options -> {attributes}) . ' onKeyPress="if (window.event.keyCode != 27) is_dirty=true" onKeyDown="tabOnEnter()" onFocus="scrollable_table_is_blocked = true; " onBlur="scrollable_table_is_blocked = false; ">';
 }
 
 ################################################################################
@@ -568,8 +568,8 @@ sub draw_form_field_file {
 			type="file"
 			name="_$$options{name}"
 			size=$$options{size}
-			onFocus="scrollable_table_is_blocked = true; q_is_focused = true"
-			onBlur="scrollable_table_is_blocked = false; q_is_focused = false"
+			onFocus="scrollable_table_is_blocked = true; "
+			onBlur="scrollable_table_is_blocked = false; "
 			onChange="is_dirty=true; $$options{onChange}"
 			tabindex=-1
 		>
@@ -609,8 +609,8 @@ sub draw_form_field_text {
 	return <<EOH;
 		<textarea 
 			$attributes 
-			onFocus="scrollable_table_is_blocked = true; q_is_focused = true" 
-			onBlur="scrollable_table_is_blocked = false; q_is_focused = false" 
+			onFocus="scrollable_table_is_blocked = true; " 
+			onBlur="scrollable_table_is_blocked = false; " 
 			rows=$$options{rows}
 			cols=$$options{cols}
 			name="_$$options{name}" 
@@ -625,7 +625,7 @@ EOH
 sub draw_form_field_password {
 	my ($_SKIN, $options, $data) = @_;
 	my $attributes = dump_attributes ($options -> {attributes});
-	return qq {<input type="password" name="_$$options{name}" size="$$options{size}" onKeyPress="if (window.event.keyCode != 27) is_dirty=true" $attributes onKeyDown="tabOnEnter()" onFocus="scrollable_table_is_blocked = true; q_is_focused = true" onBlur="scrollable_table_is_blocked = false; q_is_focused = false">};
+	return qq {<input type="password" name="_$$options{name}" size="$$options{size}" onKeyPress="if (window.event.keyCode != 27) is_dirty=true" $attributes onKeyDown="tabOnEnter()" onFocus="scrollable_table_is_blocked = true; " onBlur="scrollable_table_is_blocked = false; ">};
 }
 
 ################################################################################
@@ -693,10 +693,11 @@ sub draw_form_field_radio {
 		delete $value -> {attributes} -> {name};
 		delete $value -> {attributes} -> {value};
 		delete $value -> {attributes} -> {id};
+		delete $value -> {attributes} -> {onclick};
 	
 		my $attributes = dump_attributes ($value -> {attributes});
 
-		$html .= qq {\n<tr><td valign=top width=1%><nobr><input $attributes id="$value" onFocus="scrollable_table_is_blocked = true; q_is_focused = true" onBlur="scrollable_table_is_blocked = false; q_is_focused = false" type="radio" name="_$$options{name}" value="$$value{id}" onClick="is_dirty=true" onKeyDown="tabOnEnter()">&nbsp;$$value{label}</nobr>};
+		$html .= qq {\n<tr><td valign=top width=1%><nobr><input $attributes id="$value" onFocus="scrollable_table_is_blocked = true; " onBlur="scrollable_table_is_blocked = false; " type="radio" name="_$$options{name}" value="$$value{id}" onClick="is_dirty=true;$$value{onclick}" onKeyDown="tabOnEnter()">&nbsp;$$value{label}</nobr>};
 							
 		$value -> {html} or next;
 		
@@ -799,7 +800,7 @@ sub draw_form_field_checkboxes {
 				$subhtml .= $value -> {html};
 				$subhtml .= $value -> {inline} ? qq{</span>} : '';
 				
-				$subattr = qq{onClick="setVisible('$id', checked)"} unless $options -> {expand_all};
+				$subattr = qq{onClick="setVisible('$id', checked, '$$options{mark_sublevel}')"} unless $options -> {expand_all};
 				
 			}
 			elsif ($value -> {items} && @{$value -> {items}} > 0) {
@@ -821,7 +822,7 @@ sub draw_form_field_checkboxes {
 					</div>
 EOH
 			
-				$subattr = qq{onClick="setVisible('$id', checked)"} unless $options -> {expand_all};
+				$subattr = qq{onClick="setVisible('$id', checked, '$$options{mark_sublevel}')"} unless $options -> {expand_all};
 			
 			}
 		
@@ -1096,8 +1097,12 @@ sub draw_toolbar_input_select {
 		$html .= ': ';
 	}
 	
+	my $name = $$options{name};
+	
+	$name = "_$name" if defined $options -> {other};
+	
 	$html .= <<EOH;
-		<select name="$$options{name}" onChange="submit()" onkeypress="typeAhead()" style="visibility:expression(last_vert_menu && last_vert_menu [0] ? 'hidden' : '')">
+		<select name="$name" id="${name}_select" onChange="$$options{onChange}" onkeypress="typeAhead()" style="visibility:expression(last_vert_menu && last_vert_menu [0] ? 'hidden' : '')">
 EOH
 
 	if (defined $options -> {empty}) {
@@ -1110,7 +1115,89 @@ EOH
 		$html .= qq {<option value="$$value{id}" $$value{selected}>$$value{label}</option>};
 	}
 
-	$html .= "</select><td><img height=15 vspace=1 hspace=4 src='$_REQUEST{__static_url}/razd1.gif?$_REQUEST{__static_salt}' width=2 border=0></td>";
+
+
+
+
+
+	if (defined $options -> {other}) {
+		$html .= qq {<option value=-1>${$$options{other}}{label}</option>};
+	}
+
+	$html .= '</select>';
+
+	my $width;
+	if (defined $options -> {other} -> {width}) {
+		$width = "${$$options{other}}{width}";
+#	} elsif (defined $options -> {other} -> {left}) {
+#		$width = "expression(this.offsetParent.offsetWidth)"; 
+#	} else {
+#		$width = "expression(getElementById('_$$options{name}_select').offsetParent.offsetWidth - 10)";
+	}
+	if (defined $options -> {other}) {
+		$html .= <<EOH;
+			<div id="_$$options{name}_div" style="{position:absolute; display:none; width:$width}">
+				<iframe name="_$$options{name}_iframe" id="_$$options{name}_iframe" width=100% height=${$$options{other}}{height} src="/i/0.html" application="yes">
+				</iframe>
+			</div>
+EOH
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	$html .= "<td><img height=15 vspace=1 hspace=4 src='$_REQUEST{__static_url}/razd1.gif?$_REQUEST{__static_salt}' width=2 border=0></td>";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	return $html;
 	
@@ -1178,8 +1265,8 @@ sub draw_toolbar_input_text {
 			size=$$options{size} 
 			name=$$options{name} 
 			value="$$options{value}" 
-			onFocus="scrollable_table_is_blocked = true; q_is_focused = true" 
-			onBlur="scrollable_table_is_blocked = false; q_is_focused = false"
+			onFocus="scrollable_table_is_blocked = true; " 
+			onBlur="scrollable_table_is_blocked = false; "
 			style="visibility:expression(last_vert_menu && last_vert_menu [0] ? 'hidden' : '')"
 		>
 EOH
@@ -1674,7 +1761,19 @@ sub draw_input_cell {
 
 	my $attributes = dump_attributes ($data -> {attributes});
 
-	return qq {<td $$data{title} $attributes><nobr><input onFocus="q_is_focused = true; left_right_blocked = true;" onBlur="q_is_focused = false; left_right_blocked = false;" type="text" name="$$data{name}" value="$$data{label}" maxlength="$$data{max_len}" size="$$data{size}"></nobr></td>};
+	return qq {<td $$data{title} $attributes><nobr><input type="text" name="$$data{name}" value="$$data{label}" maxlength="$$data{max_len}" size="$$data{size}"></nobr></td>};
+
+}
+
+################################################################################
+
+sub draw_textarea_cell {
+
+	my ($_SKIN, $data, $options) = @_;
+
+	my $attributes = dump_attributes ($data -> {attributes});
+
+	return qq {<td $$data{title} $attributes><textarea $attributes rows=$$data{rows} cols=$$data{cols} name="$$data{name}">$$data{label}</textarea></td>};
 
 }
 
@@ -1887,7 +1986,7 @@ EOH
 	if ($page -> {error_field}) {
 		$html .= <<EOJ;
 			var e = window.parent.document.getElementsByName('$page->{error_field}'); 
-			if (e && e[0]) { e[0].focus () }				
+			if (e && e[0]) { try {e[0].focus ()} catch (e) {} }				
 EOJ
 	}
 
@@ -1928,15 +2027,15 @@ sub draw_page {
 			<script>
 				function main () {
 					
-					var element = window.parent.document.forms ['$_REQUEST{__only_form}'].elements ['_$_REQUEST{__only_field}'];
-					
+					var element = window.parent.document.getElementById ('input_$_REQUEST{__only_field}');
+				
 					if (element) {
 						element.outerHTML = "$page->{body}";
-						element.tabIndex = "$_REQUEST{__only_tabindex}";
 					}
 					else {
-						element = window.parent.document.getElementById ('input_$_REQUEST{__only_field}');
+						element = window.parent.document.forms ['$_REQUEST{__only_form}'].elements ['_$_REQUEST{__only_field}'];
 						element.outerHTML = "$page->{body}";
+						element.tabIndex = "$_REQUEST{__only_tabindex}";
 					}
 					
 				}
@@ -2256,11 +2355,11 @@ sub draw_logon_form {
 													<tr>
 														<td bgcolor=#8e8e8e rowspan=2><img height=1 src="/i/0.gif" width=16 border=0></td>
 														<td class=color0 bgcolor=#8e8e8e>&nbsp;<b>$$i18n{name}:</b>&nbsp;</td>
-														<td align=middle bgcolor=#8e8e8e><input style="width: 130px" size=15 name=login onfocus="q_is_focused = true" onblur="q_is_focused = false"></td>
+														<td align=middle bgcolor=#8e8e8e><input style="width: 130px" size=15 name=login ></td>
 													</tr>
 													<tr>
 														<td class=color0 bgcolor=#8e8e8e>&nbsp;<b>$$i18n{password}:</b>&nbsp;</td>
-														<td align=middle bgcolor=#8e8e8e><input style="width: 130px" type=password size=15 name=password onfocus="q_is_focused = true" onblur="q_is_focused = false"></td>
+														<td align=middle bgcolor=#8e8e8e><input style="width: 130px" type=password size=15 name=password></td>
 													</tr>
 												</table>
 											</td>

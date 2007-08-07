@@ -141,13 +141,21 @@ sub create_url {
 
 sub hrefs {
 
-	my ($order) = @_;
+	my ($order, $kind) = @_;
 	
-	return $order ? (
-		href      => create_url (order => $order, desc => 0, __last_last_query_string => $_REQUEST {__last_last_query_string}),
-		href_asc  => create_url (order => $order, desc => 0, __last_last_query_string => $_REQUEST {__last_last_query_string}),
-		href_desc => create_url (order => $order, desc => 1, __last_last_query_string => $_REQUEST {__last_last_query_string}),
-	) : ();
+	return $order ?
+		$kind == 1 ?
+			(
+				href      => create_url (order => $order, desc => $order eq $_REQUEST {order} ? 1 - $_REQUEST {desc} : 0, __last_last_query_string => $_REQUEST {__last_last_query_string}),
+			)
+		:	
+			(
+				href      => create_url (order => $order, desc => 0, __last_last_query_string => $_REQUEST {__last_last_query_string}),
+				href_asc  => create_url (order => $order, desc => 0, __last_last_query_string => $_REQUEST {__last_last_query_string}),
+				href_desc => create_url (order => $order, desc => 1, __last_last_query_string => $_REQUEST {__last_last_query_string}),
+			)
+	:
+		();
 	
 }
 
@@ -1396,6 +1404,62 @@ sub draw_form_field_radio {
 		$value -> {attributes} -> {tabindex} = ++ $_REQUEST {__tabindex};
 		$value -> {attributes} -> {checked} = 1 if $data -> {$options -> {name}} == $value -> {id};
 					
+		if (defined $options -> {detail}) {
+
+			ref $options -> {detail} eq ARRAY or $options -> {detail} = [$options -> {detail}];
+
+			foreach my $detail_ (@{$options -> {detail}}) {
+
+				my $codetails;
+				if (ref $detail eq HASH) {
+					($detail, $codetails) = each (%{$detail_}); 
+				} else {
+					$detail = $detail_;
+				}
+				my $codetail_js;
+				if (defined $codetails) {
+					ref $codetails eq ARRAY or $codetails = [$codetails];
+					foreach my $codetail (@{$codetails}) {
+						$codetail_js .= <<EOS
+						'&_$codetail=' +
+						document.getElementById('_${codetail}_select').options[document.getElementById('_${codetail}_select').selectedIndex].value +  
+EOS
+					}
+				}
+ 
+				my $h = {href => {}};
+
+				check_href ($h);
+
+				my $onchange = $_REQUEST {__windows_ce} ? "loadSlaveDiv ('$$h{href}&__only_field=${detail}&__only_form=' + this.form.name + '&_$$options{name}=' + this.options[this.selectedIndex].value);" : <<EOS;
+					activate_link (
+
+						'$$h{href}&__only_field=${detail}&__only_form=' + 
+						this.form.name + 
+						'&_$$options{name}=' + 
+						this.value + 
+$codetail_js
+						tab
+
+						, 'invisible_${detail}'
+
+					);
+
+EOS
+
+				$value -> {onclick} .= <<EOJS;
+
+					var element = this.form.elements['_${detail}'];
+					
+					var tab = element ? '&__only_tabindex=' + element.tabIndex : '';
+					
+$onchange
+
+EOJS
+	
+ 			}
+		}
+
 		$value -> {type} ||= 'select' if $value -> {values};		
 		$value -> {type} or next;
 			
@@ -1405,7 +1469,11 @@ sub draw_form_field_radio {
 		delete $value -> {attributes} -> {class};
 						
 	}
-			
+
+	foreach my $detail (@{$options -> {detail}}) {
+		push @{$_REQUEST{__invisibles}}, 'invisible_' . $detail;
+	}
+
 	return $_SKIN -> draw_form_field_radio (@_);
 	
 }
@@ -1825,6 +1893,72 @@ sub draw_toolbar_input_select {
 		$value -> {label}    = trunc_string ($value -> {label}, $options -> {max_len});						
 		$value -> {selected} = (($value -> {id} eq $_REQUEST {$options -> {name}}) or ($value -> {id} eq $options -> {value})) ? 'selected' : '';
 	}
+
+
+
+
+
+	$options -> {onChange} = 'submit();';
+
+	$options -> {onChange} = '' if defined $options -> {other} || defined $options -> {detail};
+
+	if (defined $options -> {other}) {
+
+		ref $options -> {other} or $options -> {other} = {href => $options -> {other}};
+		
+		$options -> {other} -> {label} ||= $i18n -> {voc};
+
+		check_href ($options -> {other});
+
+		$options -> {other} -> {href} =~ s{([\&\?])select\=\w+}{$1};
+		$options -> {other} -> {width}  ||= 600;
+		$options -> {other} -> {height} ||= 400;
+
+		$d_style_top = "d.style.top = " . (defined $options -> {other} -> {top} ? "${$$options{other}}{top};" : "this.offsetTop + this.offsetParent.offsetTop + this.offsetParent.offsetParent.offsetTop;");
+		$d_style_left = "d.style.left = " . (defined $options -> {other} -> {left} ? "${$$options{other}}{left};" : "this.offsetLeft + this.offsetParent.offsetLeft + this.offsetParent.offsetParent.offsetLeft;");
+
+#				d.style.top   = this.offsetTop + this.offsetParent.offsetTop + this.offsetParent.offsetParent.offsetTop;
+#				d.style.left  = this.offsetLeft + this.offsetParent.offsetLeft + this.offsetParent.offsetParent.offsetLeft;
+
+		my $onchange = $_REQUEST {__windows_ce} ? "switchDiv(); loadSlaveDiv('${$$options{other}}{href}&select=$$options{name}');" : <<EOS;
+				var fname = '_$$options{name}_iframe';
+				var f = document.getElementById (fname);
+
+				var dname = '_$$options{name}_div';
+				var d = document.getElementById (dname);
+
+				f.src = '${$$options{other}}{href}&select=$$options{name}';
+
+				$d_style_top
+				$d_style_left
+
+				d.style.display = 'block';
+				this.style.display = 'none';
+
+				d.focus ();
+EOS
+
+		$options -> {onChange} .= <<EOJS;
+
+			if (this.options[this.selectedIndex].value == -1 && window.confirm ('$$i18n{confirm_open_vocabulary}')) {
+				$onchange
+			}
+			else {
+				submit();
+			}
+
+EOJS
+
+	}		
+
+
+
+
+
+
+
+
+
 
 	return $_SKIN -> draw_toolbar_input_select ($options);
 	
@@ -2377,6 +2511,7 @@ sub draw_cells {
 			($cell -> {type} eq 'checkbox' || exists $cell -> {checked}) ? draw_checkbox_cell ($cell, $options) :
 			($cell -> {type} eq 'button'   || $cell -> {icon}) ? draw_row_button ($cell, $options) :		
 			$cell  -> {type} eq 'input'    ? draw_input_cell  ($cell, $options) :
+			$cell  -> {type} eq 'textarea' ? draw_textarea_cell  ($cell, $options) :
 			$cell  -> {type} eq 'select'   ? draw_select_cell ($cell, $options) :
 			$cell  -> {type} eq 'embed'    ? draw_embed_cell ($cell, $options) :
 			draw_text_cell ($cell, $options);
@@ -2583,6 +2718,30 @@ sub draw_input_cell {
 	check_title ($data);
 		
 	return $_SKIN -> draw_input_cell ($data, $options);
+
+}
+
+################################################################################
+
+sub draw_textarea_cell {
+
+	my ($data, $options) = @_;
+	
+	return draw_text_cell ($data, $options) if ($_REQUEST {__read_only} && !$data -> {edit}) || $data -> {read_only} || $data -> {off};
+
+	$data -> {rows} ||= 3;
+	$data -> {cols} ||= 80;
+
+	$data -> {attributes} ||= {};
+	$data -> {attributes} -> {class} ||= 'row-cell';
+	
+	_adjust_row_cell_style ($data, $options);
+						
+	$data -> {label} ||= '';
+			
+	check_title ($data);
+		
+	return $_SKIN -> draw_textarea_cell ($data, $options);
 
 }
 

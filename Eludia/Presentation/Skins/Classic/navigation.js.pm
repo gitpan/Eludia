@@ -182,12 +182,12 @@ function initialize_controls (no_focus, pack, focused_input, blur_all, _scrollab
 
 	}
 
-	if (blur_all && inputs != null) {										
-		for (var i = 0; i < inputs.length; i++) {
-			inputs [i].blur ();
-		}					
+	if (blur_all) {
+		var currObj = document.activeElement;
+		if (currObj && (currObj.tagName == 'INPUT' || currObj.tagName == 'TEXTAREA'))
+			currObj.blur ()
 	}
-
+		
 }
 
 function td_on_click () {
@@ -456,8 +456,22 @@ function menuItemOut () {
 	timer = setTimeout('hideSubMenus(0)',delay);
 }
 
-function setVisible (id, isVisible) { 
+function setVisible (id, isVisible, markSublevel) { 
 	document.getElementById (id).style.display = isVisible ? 'block' : 'none'
+        if (markSublevel && isVisible) {
+                var els = document.getElementById (id).children;
+                var hasChecked = false;
+                for (i = 0; i < els.length; i++) {
+                        if (els[i].checked) {
+                                hasChecked = true;
+                        }
+                }
+                if (!hasChecked) {
+                        for (i = 0; i < els.length; i++) {
+                                els[i].checked = true;
+                        }
+                }
+        }
 };
 
 function restoreSelectVisibility (name, rewind) {
@@ -497,10 +511,13 @@ function setSelectOption (name, id, label) {
 };
 
 function blur_all_inputs () {
-	var inputs = document.body.getElementsByTagName ('input');
-	if (!inputs) return 1;
-	for (var i = 0; i < inputs.length; i++) inputs [i].blur ();
-	return 0;
+	var currObj = document.activeElement;
+	if (currObj && (currObj.tagName == 'INPUT' || currObj.tagName == 'TEXTAREA')) {
+		currObj.blur ()
+		return 0;
+	} else 
+		return 1;
+		
 }
 
 function focus_on_first_input (td) {
@@ -558,8 +575,12 @@ function scrollCellToVisibleTop (td) {
 function handle_basic_navigation_keys () {
 
 	var keyCode = window.event.keyCode;
+	var target = window.event.srcElement;
 
-	if (keyCode == 8 && !q_is_focused) {
+	if (keyCode == 8) {
+		if (target.type && (target.type == 'text' || target.tagName == 'TEXTAREA'))
+			return; 
+		 
 		typeAheadInfo.accumString = "";
 		blockEvent ();
 		return;
@@ -589,7 +610,7 @@ function handle_basic_navigation_keys () {
 			return blockEvent ();
 		}
 		
-		if (!left_right_blocked) {
+		if (!(target.type && target.type == 'text')) {
 
 
 			if (
