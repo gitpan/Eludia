@@ -426,7 +426,6 @@ sub draw_form {
 				target="$$options{target}"
 				method="$$options{method}"
 				enctype="$$options{enctype}"
-				target="$$options{target}"
 				action="$_REQUEST{__uri}"
 			>
 EOH
@@ -1194,6 +1193,7 @@ sub draw_toolbar_input_text {
 			onBlur="scrollable_table_is_blocked = false; q_is_focused = false"
 			style="visibility:expression(last_vert_menu [0] || subsets_are_visible ? 'hidden' : '')"
 			class='form-active-inputs'
+			id="$options->{id}"
 		>
 EOH
 
@@ -1791,7 +1791,7 @@ EOH
 	if ($page -> {error_field}) {
 		$html .= <<EOJ;
 			var e = window.parent.document.getElementsByName('$page->{error_field}'); 
-			if (e && e[0]) { e[0].focus () }				
+			if (e && e[0]) { try {e[0].focus ()} catch (e) {} }				
 EOJ
 	}
 
@@ -1874,17 +1874,41 @@ EOH
 		$$page{auth_toolbar} = '';
 		
 	}
-	elsif ($parameters -> {__subset} || $parameters -> {type}) {
+	elsif (($parameters -> {__subset} || $parameters -> {type}) && !$_REQUEST {__top}) {
 	
 		$$page{auth_toolbar} = '';
 		
 		$body = $page -> {menu} . $page -> {body};
+		
+		my %h = %$parameters;
+		delete $h {salt};
+		delete $h {_salt};
+		
+		my $href = create_url (%h);
+
+		$_REQUEST {__on_load} .= <<EOJS;
+		
+			if (window.top == window) { window.location = '$href&__top=1'}
+			
+EOJS
 		
 		$onKeyDown = <<EOJS;
 		
 			if (window.event.keyCode == 88 && window.event.altKey) {
 				window.parent.document.location.href = '$_REQUEST{__uri}?type=_logout&sid=$_REQUEST{sid}&salt=@{[rand]}';
 				blockEvent ();
+			}
+			
+			if (window.event.keyCode == 116 && !window.event.altKey && !window.event.ctrlKey) {
+			
+				if (is_dirty) {
+				
+					if (!confirm ('Внимание! Вы изменили содержимое некоторых полей ввода. Перезагрузка страницы приведёт к утере этой информации. Продолжить?')) return blockEvent ();
+				
+				}
+			
+				window.location = '$href';
+				return blockEvent ();
 			}
 			
 			handle_basic_navigation_keys ();
@@ -1898,6 +1922,14 @@ EOJS
 
 		}
 
+		$onKeyDown .= <<EOJS;
+		
+			if (window.event.keyCode == 115 && !window.event.altKey && !window.event.ctrlKey) {
+				return blockEvent ();
+			}
+			
+EOJS
+
 	}
 	else {
 	
@@ -1906,11 +1938,8 @@ EOJS
 		$_REQUEST {__no_focus} = 1;
 		
 		$body = <<EOIFRAME;
-			<div id="body_iframe_div">
-				<iframe name='_body_iframe' id='_body_iframe' src="$href" width=100% height=100% border=0 frameborder=0 marginheight=0 marginwidth=0>
-				</iframe>
-			</div>
-			
+			<iframe name='_body_iframe' id='_body_iframe' src="$href" width=100% height=100% border=0 frameborder=0 marginheight=0 marginwidth=0>
+			</iframe>
 EOIFRAME
 
 	}
@@ -1988,13 +2017,6 @@ EOCSS
 EOK
 
 						$_REQUEST{__doc_on_load}
-
-						@{[ $_REQUEST {__pack} ? <<EOF : '']}
-							var newWidth  = document.all ['bodyArea'].offsetWidth + 10;
-							var newHeight = document.all ['bodyArea'].offsetHeight + 30;
-							window.resizeTo (newWidth, newHeight);						
-							window.moveTo ((screen.width - newWidth) / 2, (screen.height - newHeight) / 2);
-EOF
 
 						if (!document.body.getElementsByTagName) return;
 
@@ -2205,7 +2227,25 @@ sub handle_hotkey_focus {
 	<<EOJS
 		if (window.event.keyCode == $$r{code} && window.event.altKey && window.event.ctrlKey) {
 			document.form.$$r{data}.focus ();
-			blockEvent ();
+			return blockEvent ();
+		}
+EOJS
+
+}
+
+################################################################################
+
+sub handle_hotkey_focus_id {
+
+	my ($r) = @_;
+
+	my $ctrl = $r -> {ctrl} ? '' : '!';
+	my $alt  = $r -> {alt}  ? '' : '!';
+
+	<<EOJS
+		if (window.event.keyCode == $$r{code} && $alt window.event.altKey && $ctrl window.event.ctrlKey) {
+			document.getElementById('$r->{data}').focus ();
+			return blockEvent ();
 		}
 EOJS
 
@@ -2232,7 +2272,7 @@ sub handle_hotkey_href {
 				if ($condition) {
 					nope ('$$r{href}&__from_table=1&salt=' + Math.random () + '&' + scrollable_rows [scrollable_table_row].id, '_self');
 				}
-				blockEvent ();
+				return blockEvent ();
 			}
 EOJS
 
@@ -2245,7 +2285,7 @@ EOJS
 					var a = document.getElementById ('$$r{data}');
 					activate_link (a.href, a.target);
 				}
-				blockEvent ();
+				return blockEvent ();
 			}
 EOJS
 	}
