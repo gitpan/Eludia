@@ -1670,6 +1670,7 @@ sub draw_text_cell {
 
 	my $html = "\n\t<td ";
 	$html .= dump_attributes ($data -> {attributes}) if $data -> {attributes};
+	$html .= ' style="padding-left:' . ($data -> {level} * 15 + 3) . '"' if (defined $data -> {level});
 	$html .= '>';
 	
 	unless ($data -> {off}) {
@@ -1681,7 +1682,7 @@ sub draw_text_cell {
 
 		$html .= '<nobr>' unless $data -> {no_nobr};
 
-		$html .= '&nbsp;';		
+		$html .= '&nbsp;' unless (defined $data -> {level});		
 
 		$html .= '<b>'      if $data -> {bold}   || $options -> {bold};
 		$html .= '<i>'      if $data -> {italic} || $options -> {italic};
@@ -1870,8 +1871,10 @@ sub draw_table_header_cell {
 	}	
 
 	my $attributes = dump_attributes ($cell -> {attributes});
+
+	my $z_index = $cell -> {no_scroll} ? 'style="z-index:110"' : 'style="z-index:100"';
 	
-	return "<th $attributes $$cell{title}>\&nbsp;$$cell{label}\&nbsp;</th>";
+	return "<th $attributes $$cell{title} $z_index>\&nbsp;$$cell{label}\&nbsp;</th>";
 
 }
 
@@ -2030,12 +2033,15 @@ sub draw_page {
 					
 					var element = window.parent.document.getElementById ('input_$_REQUEST{__only_field}');
 				
+					var html = "$page->{body}";
+
 					if (element) {
-						element.outerHTML = "$page->{body}";
+						element.outerHTML = html;
+						element.tabIndex = "$_REQUEST{__only_tabindex}";
 					}
 					else {
 						element = window.parent.document.forms ['$_REQUEST{__only_form}'].elements ['_$_REQUEST{__only_field}'];
-						element.outerHTML = "$page->{body}";
+						element.outerHTML = html;
 						element.tabIndex = "$_REQUEST{__only_tabindex}";
 					}
 					
@@ -2135,6 +2141,8 @@ EOCSS
 						$_REQUEST{__on_load}
 					
 					}
+					
+					$_REQUEST{__script}
 					
 				</script>
 				

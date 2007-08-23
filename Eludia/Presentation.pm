@@ -104,7 +104,7 @@ sub esc_href {
 
 	if ($conf -> {core_auto_esc} == 2) {
 	
-		my $href = sql_select_scalar ("SELECT href FROM $SQL_VERSION->{quote}__access_log$SQL_VERSION->{quote} WHERE id_session = ? AND no = ?", $_REQUEST {sid}, $_REQUEST {__last_last_query_string});
+		my $href = sql_select_scalar ("SELECT href FROM $conf->{systables}->{__access_log} WHERE id_session = ? AND no = ?", $_REQUEST {sid}, $_REQUEST {__last_last_query_string});
 		$href ||= "/?type=$_REQUEST{type}";
 
 		if (exists $_REQUEST {__last_scrollable_table_row}) {
@@ -839,7 +839,7 @@ sub draw_form {
 		);
 	}	
 	elsif ($conf -> {core_auto_esc} > 0 && $_REQUEST {__last_query_string}) {
-		$options -> {esc} = esc_href ();
+		$options -> {esc} ||= esc_href ();
 	}
 
 	our $tabindex = 1;
@@ -1266,8 +1266,7 @@ sub draw_form_field_static {
 		delete $options -> {href};
 	}
 	
-		
-	my $value = $data -> {$options -> {name}};	
+	my $value = $options -> {value} || $data -> {$options -> {name}};	
 
 	my $static_value = '';
 	
@@ -1894,7 +1893,7 @@ sub draw_toolbar_input_select {
 		$value -> {selected} = (($value -> {id} eq $_REQUEST {$options -> {name}}) or ($value -> {id} eq $options -> {value})) ? 'selected' : '';
 	}
 
-	$options -> {onChange} = 'submit();';
+	$options -> {onChange} ||= 'submit();';
 
 	$options -> {onChange} = '' if defined $options -> {other} || defined $options -> {detail};
 
@@ -2562,6 +2561,7 @@ sub _adjust_row_cell_style {
 			$options -> {is_total} ? 'row-cell-total' : 
 			$data -> {attributes} -> {bgcolor} ? 'row-cell-transparent' : 
 			'row-cell';
+		$data -> {attributes} -> {class} .= '-no-scroll' if ($data -> {no_scroll} && $data -> {attributes} -> {class} =~ /row-cell/);
 	}	
 
 }
@@ -2888,6 +2888,7 @@ sub draw_table_header_cell {
 	
 	$cell -> {attributes} ||= {};
 	$cell -> {attributes} -> {class}   ||= 'row-cell-header';
+	$cell -> {attributes} -> {class}    .= '-no-scroll' if ($cell -> {no_scroll});
 	$cell -> {attributes} -> {colspan} ||= $cell -> {colspan};
 	$cell -> {attributes} -> {rowspan} ||= $cell -> {rowspan};
 	
@@ -3212,7 +3213,7 @@ sub draw_page {
 		&& $conf -> {core_screenshot} -> {exclude_types} !~ /\b$$page{type}\b/
 		&& !$_REQUEST {__edit}
 	) {
-		sql_do ("INSERT INTO __screenshots (subset, type, id_object, id_user, html, error, params, gziped) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+		sql_do ("INSERT INTO $conf->{systables}->{__screenshots} (subset, type, id_object, id_user, html, error, params, gziped) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
 			$_SUBSET -> {name}, $page -> {type}, $_REQUEST {id}, $_USER -> {id}, Compress::Zlib::memGzip ($html), !$validate_error && $_REQUEST {error} ? 1 : 0, Dumper (\%_REQUEST));
 	}
 
@@ -3254,7 +3255,7 @@ warn "\$href='$href'(1)\n";
 
 	if ($_USER -> {peer_server}) {
 	
-		$_REQUEST {sid} = sql_select_scalar ('SELECT peer_id FROM sessions WHERE id = ?', $_REQUEST {sid});
+		$_REQUEST {sid} = sql_select_scalar ("SELECT peer_id FROM $conf->{systables}->{sessions} WHERE id = ?", $_REQUEST {sid});
 	
 	}
 
