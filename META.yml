@@ -1,0 +1,25 @@
+--- #YAML:1.0
+name:                Eludia
+version:             07.09.03
+abstract:            A RAD platform for WEB GUIs with rich DHTML widget set.
+license:             ~
+generated_by:        ExtUtils::MakeMaker version 6.36
+distribution_type:   module
+requires:     
+    Apache:                        
+    DBI:                           1.21
+    Digest::MD5:                   
+    Fcntl:                         
+    File::Temp:                    
+    JSON::XS:                      1.43
+    MIME::Base64:                  
+    Net::SMTP:                     
+    Number::Format:                1.45
+    Storable:                      
+    Time::HiRes:                   
+    XML::Simple:                   2.14
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
+    version: 1.2
+author:
+    - D. Ovsyanko

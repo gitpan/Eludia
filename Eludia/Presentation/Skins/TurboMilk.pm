@@ -3,8 +3,15 @@ package Eludia::Presentation::Skins::TurboMilk;
 use Data::Dumper;
 
 BEGIN {
+
 	require Eludia::Presentation::Skins::Generic;
 	delete $INC {"Eludia/Presentation/Skins/Generic.pm"};
+
+	our $replacement = {
+		error    => 'JS',
+		redirect => 'JS',
+	};
+
 }
 
 ################################################################################
@@ -1773,40 +1780,6 @@ sub draw_one_cell_table {
 				</form>
 		</table>
 EOH
-
-}
-
-################################################################################
-
-sub draw_error_page {
-
-	my ($_SKIN, $page) = @_;
-
-	my $html = <<EOH;
-		<html>
-			<head></head>
-			<body onLoad="
-EOH
-
-	if ($page -> {error_field}) {
-		$html .= <<EOJ;
-			var e = window.parent.document.getElementsByName('$page->{error_field}'); 
-			if (e && e[0]) { try {e[0].focus ()} catch (e) {} }				
-EOJ
-	}
-
-	my $message = js_escape ($_REQUEST {error});
-								
-	$html .= <<EOH;
-		history.go (-1); 
-		alert ($message);
-		window.parent.document.body.style.cursor = 'normal';
-	">
-				</body>
-			</html>				
-EOH
-
-	return $html;
 
 }
 

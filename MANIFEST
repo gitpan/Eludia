@@ -63,6 +63,7 @@ Eludia/Presentation/Skins/Classic/w_20_1.gif.pm
 Eludia/Presentation/Skins/Dumper.pm
 Eludia/Presentation/Skins/Generic.pm
 Eludia/Presentation/Skins/JS.pm
+Eludia/Presentation/Skins/JS/navigation.js.pm
 Eludia/Presentation/Skins/TurboMilk.pm
 Eludia/Presentation/Skins/TurboMilk/0.gif.pm
 Eludia/Presentation/Skins/TurboMilk/0.html.pm
@@ -212,3 +213,4 @@ lib/DBIx/MySQLite.pm
 Makefile.PL
 MANIFEST			This list of files
 t/use.t
+META.yml                                 Module meta-data (added by MakeMaker)

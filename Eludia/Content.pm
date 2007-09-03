@@ -1324,13 +1324,11 @@ sub redirect {
 
 	$options ||= {};
 	$options -> {kind} ||= 'http';
-	$options -> {kind} = 'http' if ($_REQUEST {select});
-#	$options -> {kind} = 'http' if ($_REQUEST {__windows_ce});
+	$options -> {kind}   = 'http' if ($_REQUEST {__windows_ce} && $_REQUEST {select});
 
 	if ($options -> {kind} eq 'http' || $options -> {kind} eq 'internal') {
 
 		$r -> status ($options -> {status} || 302);
-
 		$r -> headers_out -> {'Location'} = $url;
 		$r -> send_http_header unless (MP2);
 		$_REQUEST {__response_sent} = 1;
@@ -1339,41 +1337,9 @@ sub redirect {
 	}
 
 	if ($options -> {kind} eq 'js') {
-
-		if ($options -> {label}) {
-			$options -> {before} = 'alert(' . js_escape ($options -> {label}) . '); ';
-		}
-
-		my $target = $options -> {target} ? "'$$options{target}'" : "(window.name == 'invisible' ? '_parent' : '_self')";
-				
-		if ($_REQUEST {__x}) {
-								
-			out_html ({}, XML::Simple::XMLout ({
-				url   => $url,
-			}, 
-				RootName => 'redirect',
-				XMLDecl  => '<?xml version="1.0" encoding="windows-1251"?>',
-			));
-					
-		}
-		elsif ($_REQUEST {__d}) {
-			out_html ({}, Dumper ({redirect => {url   => $url}}));
-		}
-		else {
-
-			out_html ({}, <<EOH);
-<html>
-	<head>
-		<script src="$_REQUEST{__static_url}/navigation.js?$_REQUEST{__static_salt}">
-		</script>
-	</head>
-	<body onLoad="$$options{before}; nope ('$url&salt=' + Math.random (), $target)">
-	</body>
-</html>
-EOH
-
-		}
-
+	
+		$options -> {url} = $url;	
+		out_html ({}, draw_redirect_page ($options));
 		$_REQUEST {__response_sent} = 1;
 		return;
 		
@@ -1433,61 +1399,6 @@ sub select__boot {
 
 	return {};
 
-}
-
-################################################################################
-
-sub select__static_files {
-
-	$ENV{PATH_INFO} =~ /\w+\.\w+/ or $r -> filename =~ /\w+\.\w+/ or $ENV {REQUEST_URI} =~ /\w+\.\w+/;
-	
-	my $filename = $&;
-	
-	my $v = '_' . $Eludia_VERSION_NAME;
-	$filename =~ s{$v}{}i;
-
-	$filename =~ s{_00000\d+(\.[a-z]{2,3})$}{$1};
-
-	my $content_type = 
-		$filename =~ /\.js/ ? 'application/x-javascript' :
-		$filename =~ /\.css/ ? 'text/css' :
-		$filename =~ /\.htm/ ? 'text/html' :
-		'application/octet-stream';
-
-	my $path = $_SKIN -> static_path ($filename);
-	my $gzip = 0;
-
-#warn ("select__static_files (1): \$path = '$path'\n");
-
-	if (-f "$path.gz.pm" && $r -> headers_in -> {'Accept-Encoding'} =~ /gzip/) {
-		$path .= '.gz';
-		$path .= '.pm';
-		$gzip = 1;
-	}
-	else {
-		$path .= '.pm';
-	}
-	
-#warn ("select__static_files (2): \$path = '$path'\n");
-	
-	$r -> content_type ($content_type);
-	$r -> content_encoding ('gzip') if $gzip;
-	$r -> headers_out -> {'Content-Length'} = -s $path;
-	$r -> headers_out -> {'Cache-Control'} = 'max-age=' . 24 * 60 * 60;
-	
-	$r -> send_http_header () unless (MP2);
-
-	if (MP2) {
-		$r->sendfile($path);
-	} else {
-		open (F, $path) or die ("Can't open $path: $!\n");
-		$r -> send_fd (F);
-		close (F);
-	}
-
-	
-	$_REQUEST {__response_sent} = 1;
-	
 }
 
 ################################################################################

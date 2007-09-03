@@ -11,7 +11,6 @@ BEGIN {
 sub options {
 
 	return {
-		no_static => 1,
 		no_navigation => 1,
 	};
 
@@ -39,8 +38,66 @@ sub draw_error_page {
 
 	my $data = $_JSON -> encode ([$_REQUEST {error}]);
 
-	return qq{<html><body onLoad="var data = $data; alert (data [0]);"></body><html>};
+	$_REQUEST {__script} = <<EOJ;
+		function onload () {
+EOJ
+
+	if ($page -> {error_field}) {
+		$_REQUEST{__script} .= <<EOJ;
+			var e = window.parent.document.getElementsByName('$page->{error_field}'); 
+			if (e && e[0]) { try {e[0].focus ()} catch (e) {} }				
+EOJ
+	}
+								
+	$_REQUEST {__script} .= <<EOJ;
+			history.go (-1);
+			var data = $data;
+			alert (data [0]);
+			window.parent.document.body.style.cursor = 'normal';
+		}
+EOJ
+
+	return qq{<html><head><script>$_REQUEST{__script}</script></head><body onLoad="onload ()"></body><html>};
 
 }
+
+################################################################################
+
+sub draw_redirect_page {
+
+	my ($_SKIN, $options) = @_;
+
+	my $target = $options -> {target} ? "'$$options{target}'" : "(window.name == 'invisible' ? '_parent' : '_self')";
+
+	if ($options -> {label}) {
+		my $data = $_JSON -> encode ([$_REQUEST {error}]);
+		$options -> {before} = "var data = $data; alert(data[0]); ";
+	}				
+
+	return <<EOH;
+<html>
+	<head>
+		<script src="$_REQUEST{__static_url}/navigation.js?$_REQUEST{__static_salt}">
+		</script>
+	</head>
+	<body onLoad="$$options{before}nope ('$options->{url}&salt=' + Math.random (), $target)">
+	</body>
+</html>
+EOH
+
+}
+
+################################################################################
+
+sub static_path {
+
+	my ($package, $file) = @_;
+	my $path = __FILE__;
+
+	$path    =~ s{\.pm}{/$file};
+
+	return $path;
+
+};
 
 1;

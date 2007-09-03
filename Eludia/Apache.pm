@@ -45,6 +45,8 @@ sub get_request {
 
 sub setup_skin {
 
+	my ($options) = @_;
+
 	eval {$_REQUEST {__skin} ||= get_skin_name ()};
 
 	unless ($_REQUEST {__skin}) {
@@ -69,6 +71,13 @@ sub setup_skin {
 
 	$_REQUEST {__skin} ||= $preconf -> {core_skin};
 	$_REQUEST {__skin} ||= 'Classic';
+	
+	$options -> {kind} = 'error' if $_REQUEST {error};
+	
+	if ($options -> {kind}) {
+		eval "require Eludia::Presentation::Skins::$_REQUEST{__skin}";
+		$_REQUEST {__skin} = (${"Eludia::Presentation::Skins::$_REQUEST{__skin}::replacement"} -> {$options->{kind}} ||= $_REQUEST {__skin});
+	}
 
 	our $_SKIN = "Eludia::Presentation::Skins::$_REQUEST{__skin}";
 	eval "require $_SKIN";
@@ -207,9 +216,21 @@ sub handler {
 
 	require_fresh ($_PACKAGE . 'Config');
 
-	if ($r -> uri =~ m{/\w+\.(css|gif|ico|js|html)$}) {
-		select__static_files ();
+	if ($r -> uri =~ m{/(\w+)\.(css|gif|ico|js|html)$}) {
+
+		my $fn = "$1.$2";
+		
+		if ($fn eq 'favicon.ico' && -f $r -> document_root () . '/i/favicon.ico') {
+			$r -> internal_redirect ('/i/favicon.ico');
+			return OK;
+		}
+		
+		setup_skin ();
+		
+		$r -> internal_redirect ("/i/_skins/$_REQUEST{__skin}/$fn");
+	
 		return OK;
+		
 	}
 
 	if ($preconf -> {core_auth_cookie}) {
