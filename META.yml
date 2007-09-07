@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Eludia
-version:             07.09.03
+version:             07.09.06
 abstract:            A RAD platform for WEB GUIs with rich DHTML widget set.
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.36
