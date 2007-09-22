@@ -115,7 +115,7 @@ sub esc_href {
 
 		$href = check_href ({href => $href}, 1);
 
-		return $href;
+		return uri_unescape ($href);
 		
 	}
 
@@ -125,7 +125,8 @@ sub esc_href {
 	my $salt = time (); #rand ();
 	$query_string =~ s{salt\=[\d\.]+}{salt=$salt}g;
 	$query_string =~ s{sid\=[\d\.]+}{sid=$_REQUEST{sid}}g;
-	return $_REQUEST {__uri} . '?' . $query_string;
+	
+	return $_REQUEST {__uri} . '?' . uri_unescape ($query_string);
 	
 	
 }
@@ -786,7 +787,13 @@ sub draw_window_title {
 sub draw_logon_form {
 
 	my ($options) = @_;
+
+	if ($options -> {hta}) {
 	
+		$_REQUEST {__script} .= json_dump_to_function (hta => $options -> {hta});				
+	
+	}
+			
 	return $_SKIN -> draw_logon_form (@_);
 
 }
@@ -1743,7 +1750,8 @@ sub draw_toolbar {
 
 	$_REQUEST {__toolbars_number} ||= 0;
 
-	my $form_name = $_REQUEST {__toolbars_number} ? 'toolbar_form_' . $_REQUEST {__toolbars_number} : 'toolbar_form';
+	$options -> {form_name} = $_REQUEST {__toolbars_number} ? 'toolbar_form_' . $_REQUEST {__toolbars_number} : 'toolbar_form';
+
 	$_REQUEST {__toolbars_number} ++;
 
 	if ($_REQUEST {select}) {
@@ -3174,7 +3182,7 @@ sub draw_page {
 		   $conf -> {core_screenshot} -> {allow}
 		&& $conf -> {core_screenshot} -> {subsets} -> {$$_SUBSET{name}}
 		&& $conf -> {core_screenshot} -> {exclude_types} !~ /\b$$page{type}\b/
-		&& !$_REQUEST {__edit}
+		&& ($conf -> {core_screenshot} -> {allow_edit} || !$_REQUEST {__edit})
 	) {
 		sql_do ("INSERT INTO $conf->{systables}->{__screenshots} (subset, type, id_object, id_user, html, error, params, gziped) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
 			$_SUBSET -> {name}, $page -> {type}, $_REQUEST {id}, $_USER -> {id}, Compress::Zlib::memGzip ($html), !$validate_error && $_REQUEST {error} ? 1 : 0, Dumper (\%_REQUEST));

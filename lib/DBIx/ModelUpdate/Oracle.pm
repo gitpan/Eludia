@@ -85,37 +85,6 @@ EOS
 
 }
 
-################################################################################
-
-sub get_tables {
-
-	my ($self, $options) = @_;
-	
-	my $st = $self -> prepare ("SELECT table_name FROM user_tables");
-	$st -> execute;
-	my $tables = {};
-	
-	while (my $r = $st -> fetchrow_hashref) {
-		my $name = lc ($r -> {TABLE_NAME});
-		$name =~ s{\W}{}g;
-		$tables -> {$name} = {
-#			columns => $self -> get_columns ($name, $options), 
-#			keys => $self -> get_keys ($name),
-		}
-	}	
-
-	$st -> finish;
-
-#print STDERR "get_tables (pid=$$): $tables = " . Dumper ($tables);
-	
-	foreach my $name (keys %$tables) {
-		$tables -> {$name} -> {columns} = $self -> get_columns ($name, $options);
-		$tables -> {$name} -> {keys}    = $self -> get_keys ($name);
-	}
-	
-	return $tables;
-
-}
 
 ################################################################################
 
@@ -234,8 +203,30 @@ sub gen_column_definition {
 		$sql .= ' DEFAULT ' . ($definition -> {COLUMN_DEF} eq 'SYSDATE' ? 'SYSDATE' : $self -> {db} -> quote ($definition -> {COLUMN_DEF}));
 	}
 
-	$sql .= ' CONSTRAINT nn_' . $table_name . '_' . $name . ' NOT NULL' unless $definition -> {NULLABLE};
-	$sql .= ' CONSTRAINT pk_' . $table_name . '_' . $name . ' PRIMARY KEY' if $definition -> {_PK};
+	my ($nn_constraint_name, $pk_constraint_name) = ('nn_' . $table_name . '_' . $name, 'pk_' . $table_name . '_' . $name);
+	
+	if (length ($nn_constraint_name ) > 30) {
+			my ($i, $cn) = ($self -> {nn_constraint_num} || 0);
+			$nn_constraint_name = substr ($nn_constraint_name, 0, 25);
+			while ($self -> sql_select_scalar ('SELECT constraint_name FROM all_constraints WHERE owner = ? AND constraint_name = ?', $self->{schema}, $nn_constraint_name . "_$i")) {
+				$i ++;
+			}
+			$nn_constraint_name .= "_$i";
+			
+			$self -> {nn_constraint_num} = $i + 1;			
+	}
+	
+	if (length ($pk_constraint_name ) > 30) {
+			my $i = 0;
+			$pk_constraint_name = substr ($pk_constraint_name, 0, 25);
+			while ($self -> sql_select_scalar ('SELECT constraint_name FROM all_constraints WHERE owner = ? AND constraint_name = ?', $self->{schema}, $pk_constraint_name . "_$i")) {
+				$i ++;
+			}
+			$pk_constraint_name .= "_$i";			
+	}
+	
+	$sql .= " CONSTRAINT $nn_constraint_name NOT NULL" unless $definition -> {NULLABLE};
+	$sql .= " CONSTRAINT $pk_constraint_name PRIMARY KEY" if $definition -> {_PK};
 	
 	return $sql;
 	
@@ -255,18 +246,59 @@ sub create_table {
 	my $pk_column = (grep {$definition -> {columns} -> {$_} -> {_PK}} keys %{$definition -> {columns}}) [0];
 
 	if ($pk_column) {
-		$self -> do ("CREATE SEQUENCE $q${name}_seq$q START WITH 1 INCREMENT BY 1");
+		my $sequence_name = $name;
+		if (length ($name) > 25) {
+			my $i = 0;
+			$sequence_name = substr ($sequence_name, 0, 22);
+			while ($self -> sql_select_scalar ('SELECT sequence_name FROM all_sequences WHERE sequence_owner = ? AND sequence_name = ?', $self->{schema}, $sequence_name . "_$i")) {
+				$i ++;
+			}
+			$sequence_name .= "_$i";			
+		}
+		$self -> do ("CREATE SEQUENCE $q${sequence_name}_seq$q START WITH 1 INCREMENT BY 1");
 	
+		my $trigger_name = $name;
+		if (length ($name) > 25) {
+			my $i = 0;
+			$trigger_name = substr ($trigger_name, 0, 21);
+			while ($self -> sql_select_scalar ('SELECT trigger_name FROM all_triggers WHERE owner = ? AND trigger_name = ?', $self->{schema}, $trigger_name . "_$i")) {
+				$i ++;
+			}
+			$trigger_name .= "_$i";			
+		}
+
+
 		$self -> do (<<EOS);
-			CREATE TRIGGER $q${name}_id_trigger$q BEFORE INSERT ON $q${name}$q
+
+			CREATE TRIGGER $q${trigger_name}_trig$q BEFORE INSERT ON $q${name}$q
 			FOR EACH ROW
-			WHEN (new.$pk_column is null)
+			DECLARE
+			       MAXID 	NUMBER;
+			       CURRSEQ  NUMBER;
+			       DIFF	NUMBER;
 			BEGIN
-				SELECT $q${name}_seq$q.nextval INTO :new.$pk_column FROM DUAL;
+    				IF (:NEW.$pk_column IS NULL) THEN
+				       SELECT $q${sequence_name}_seq$q.NEXTVAL INTO :NEW.$pk_column FROM DUAL;
+			        ELSE       
+    					BEGIN       
+						SELECT $q${sequence_name}_seq$q.CURRVAL INTO CURRSEQ FROM DUAL;
+					        EXCEPTION       
+							WHEN OTHERS THEN
+					        IF (SQLCODE =-08002) THEN
+					          SELECT $q${sequence_name}_seq$q.NEXTVAL INTO DIFF FROM DUAL;
+					        END IF;
+				       END;
+				       IF (:NEW.$pk_column > CURRSEQ) THEN
+				       	   DIFF := :NEW.$pk_column - CURRSEQ;
+				           WHILE (DIFF <> 0) LOOP
+					           SELECT $q${sequence_name}_seq$q.NEXTVAL INTO :NEW.$pk_column FROM DUAL;
+					           DIFF := DIFF - 1;
+				           END LOOP;
+				       END IF;
+  	                        END IF;
 			END;		
 EOS
-
-		$self -> do ("ALTER TRIGGER $q${name}_id_trigger$q COMPILE");
+		$self -> do ("ALTER TRIGGER $q${trigger_name}_trig$q COMPILE");
 		$self -> do ("ALTER TABLE $q${name}$q ENABLE ALL TRIGGERS");
 	}
 
@@ -413,6 +445,23 @@ sub create_index {
 	warn "CREATE INDEX $q${table_name}_${index_name}$q ON $q$table_name$q ($index_def)\n";
 	$self -> {db} -> do ("CREATE INDEX $q${table_name}_${index_name}$q ON $q$table_name$q ($index_def)");
 	
+}
+
+################################################################################
+
+sub sql_select_scalar {
+
+	my ($self, $sql, @params) = @_;
+
+	my $st = $self -> prepare ($sql);
+	
+	$st -> execute (@params);
+
+	my @result = $st -> fetchrow_array ();
+	$st -> finish;
+	
+	return $result [0];
+
 }
 
 1;

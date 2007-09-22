@@ -211,7 +211,7 @@ function tabOnEnter () {
 }
 
 function typeAhead() { // borrowed from http://www.oreillynet.com/javascript/2003/09/03/examples/jsdhtmlcb_bonus2_example.html
-   
+  
    if (window.event && window.event.keyCode == 8) {
    	typeAheadInfo.accumString = "";
    	return;

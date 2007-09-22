@@ -963,6 +963,8 @@ sub do_add_DEFAULT {
 sub do_create_DEFAULT {
 
 	my $default_values = {};
+
+	my $columns = $model_update -> get_columns ($_REQUEST {type});
 	
 	while (my ($k, $v) = each %_REQUEST) {
 	
@@ -974,6 +976,7 @@ sub do_create_DEFAULT {
 		next if $k eq 'action';
 		next if $k eq 'lang';
 		next if $k eq 'error';
+		next unless exists $columns -> {$k}; 
 				
 		$default_values -> {$k} = $v;
 	
@@ -1981,6 +1984,7 @@ sub fill_in {
 		voc                      => ' справочник...',
 		wrong_month              => 'Некорректно задан месяц',
 		wrong_day                => 'Некорректно задан день',
+		hta_confirm              => 'Вы обратились к WEB-приложению по прямому адресу, как к публичному сайту. При этом окно браузера содержит панели, не нужные для работы, а настройки безопасности могут оказаться несовместимыми с логикой программы. Для более удобной работы с WEB-приложением мы рекомендуем установить на вашей рабочей станции специальный файл (HTML Application). Выполнить установку?',
 		months			 => [qw(
 			января
 			февраля

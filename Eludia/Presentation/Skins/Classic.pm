@@ -753,13 +753,37 @@ sub draw_form_field_select {
 			
 EOS
 
-		$options -> {onChange} .= <<EOJS;
+		$options -> {no_confirm} ||= $conf -> {core_no_confirm_other};
 
-			if (this.options[this.selectedIndex].value == -1 && window.confirm ('$$i18n{confirm_open_vocabulary}')) {
-				$onchange
-			}
+		if ($options -> {no_confirm}) {
+
+			$options -> {onChange} .= <<EOJS;
+
+				if (this.options[this.selectedIndex].value == -1) {
+
+					$onchange
+
+				}
 
 EOJS
+		} else {
+
+			$options -> {onChange} .= <<EOJS;
+
+				if (this.options[this.selectedIndex].value == -1) {
+
+					if (window.confirm ('$$i18n{confirm_open_vocabulary}')) {
+
+						$onchange
+
+					} else {
+
+						this.selectedIndex = 0;
+
+					}
+				}
+EOJS
+		}
 
 	}		
 
@@ -1047,7 +1071,7 @@ sub draw_toolbar {
 	
 	my $html = <<EOH;
 		<table class=bgr8 cellspacing=0 cellpadding=0 width="100%" border=0>
-			<form action=$_REQUEST{__uri} name=$form_name target="$$options{target}">
+			<form action=$_REQUEST{__uri} name=$options->{form_name} target="$$options{target}">
 EOH
 
 	foreach (@{$options -> {keep_params}}) {
