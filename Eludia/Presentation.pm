@@ -70,7 +70,7 @@ sub hotkeys {
 sub hotkey {
 
 	my ($def) = $_[0];
-		
+			
 	$def -> {type} ||= 'href';
 
 	if ($def -> {code} =~ /^F(\d+)/) {
@@ -279,6 +279,7 @@ sub check_href {
 		}
 			
 		$h {select} ||= $_REQUEST {select} if $_REQUEST {select};
+		$h {__tree} ||= $_REQUEST {__tree} if $_REQUEST {__tree};
 
 		if ($conf -> {core_auto_esc} == 2) {
 			
@@ -746,7 +747,7 @@ sub draw__sync {
 
 sub draw_auth_toolbar {
 
-	return '' if $_REQUEST {__no_navigation} or $conf -> {core_no_auth_toolbar};
+	return '' if $_REQUEST {__no_navigation} or $_REQUEST {__tree} or $conf -> {core_no_auth_toolbar};
 
 	return $_SKIN -> draw_auth_toolbar ({
 		top_banner => ($conf -> {top_banner} ? interpolate ($conf -> {top_banner}) : ''),
@@ -806,7 +807,7 @@ sub draw_form {
 	
 	return '' if $options -> {off};
 	
-	$options -> {hr} = draw_hr (height => 10);
+	$options -> {hr} = $_REQUEST {__tree} ? '' : draw_hr (height => 10);
 	
 	if (ref $data eq HASH && $data -> {fake} == -1 && !exists $options -> {no_edit}) {
 		$options -> {no_edit} = 1;
@@ -827,8 +828,9 @@ sub draw_form {
 	my   @keep_params = map {{name => $_, value => $_REQUEST {$_}}} @{$options -> {keep_params}};
 	push @keep_params, {name  => 'sid',                         value => $_REQUEST {sid}                         };
 	push @keep_params, {name  => 'select',                      value => $_REQUEST {select}                      };
-	push @keep_params, {name  => 'type',                        value => $_REQUEST {type}   || $options -> {type}};
-	push @keep_params, {name  => 'id',                          value => $_REQUEST {id}     || $options -> {id}  };
+	push @keep_params, {name  => '__tree',                      value => $_REQUEST {__tree}                      };
+	push @keep_params, {name  => 'type',                        value => $options -> {type} || $_REQUEST {type}  };
+	push @keep_params, {name  => 'id',                          value => $options -> {id} || $_REQUEST {id}      };
 	push @keep_params, {name  => 'action',                      value => $options -> {action}                    };
 	push @keep_params, {name  => '__last_query_string',         value => $_REQUEST {__last_last_query_string}    };
 	push @keep_params, {name  => '__last_scrollable_table_row', value => $_REQUEST {__last_scrollable_table_row} } unless ($_REQUEST {__windows_ce});
@@ -1060,6 +1062,9 @@ sub draw_path {
 		$item -> {id_param} ||= $options -> {id_param};		
 		$item -> {cgi_tail} ||= $options -> {cgi_tail};
 		
+		$item -> {cgi_tail} .= '&__tree=1'
+			if ($_REQUEST {__tree});
+			
 		unless ($_REQUEST {__edit} || $i == @$list - 1) {
 			$item -> {href} = "/?type=$$item{type}&$$item{id_param}=$$item{id}&$$item{cgi_tail}";
 			check_href ($item);
@@ -1762,7 +1767,11 @@ sub draw_toolbar {
 				data => 'cancel',
 			},
 		);
-
+		
+	}
+	
+	if ($_REQUEST {__tree}) {
+		push (@{$options -> {keep_params}}, '__tree');
 	}
 
 	foreach my $button (@buttons) {
@@ -2076,7 +2085,7 @@ sub draw_centered_toolbar_button {
 	
 	if ($options -> {preset}) {
 		my $preset = $conf -> {button_presets} -> {$options -> {preset}};
-		$options -> {hotkey}     ||= $preset -> {hotkey};
+		$options -> {hotkey}     ||= Storable::dclone ($preset -> {hotkey});
 		$options -> {icon}       ||= $preset -> {icon};
 		$options -> {label}      ||= $i18n -> {$preset -> {label}};
 		$options -> {label}      ||= $preset -> {label};
@@ -2086,7 +2095,7 @@ sub draw_centered_toolbar_button {
 	}	
 
 	if ($options -> {hotkey}) {
-		$options -> {id} ||= $options;
+		$options -> {id} ||= $options . '';
 		$options -> {hotkey} -> {data}    = $options -> {id};
 		$options -> {hotkey} -> {off}     = $options -> {off};
 		hotkey ($options -> {hotkey});
@@ -2114,7 +2123,8 @@ sub draw_centered_toolbar_button {
 		my $msg = js_escape ($options -> {confirm});
 		$options -> {preconfirm} ||= 1;
 		$options -> {href} =~ s{\%}{\%25}gsm; 		# wrong, but MSIE uri_unescapes the 1st arg of window.open :-(
-		$options -> {href} = qq [javascript:if (!($$options{preconfirm}) || ($$options{preconfirm} && confirm ($msg))) {nope('$$options{href}', '$target')} else {window.parent.document.body.style.cursor = 'normal'; nop ();} ];
+		my $href = js_escape ($options -> {href});
+		$options -> {href} = qq [javascript:if (!($$options{preconfirm}) || ($$options{preconfirm} && confirm ($msg))) {nope($href, '$target')} else {window.parent.document.body.style.cursor = 'normal'; nop ();} ];
 	} 	
 
 	if ($options -> {href} =~ /^java/) {
@@ -2194,7 +2204,7 @@ sub draw_ok_esc_toolbar {
 		{
 			preset => 'ok',
 			label => $options -> {label_ok}, 
-			href => $_REQUEST {__windows_ce} || $_SKIN =~ /Universal/ ? "javaScript:document.$name.submit()" : "javaScript:document.$name.fireEvent(\\'onsubmit\\'); document.$name.submit()", 
+			href => $_REQUEST {__windows_ce} || $_SKIN =~ /Universal/ ? "javaScript:document.$name.submit()" : "javaScript:document.$name.fireEvent('onsubmit'); document.$name.submit()", 
 			off  => $_REQUEST {__read_only} || $options -> {no_ok},
 		},
 		{
@@ -2282,7 +2292,7 @@ sub draw_menu {
 	
 	@$types or return '';
 	
-	$_REQUEST {__no_navigation} and return '';	
+	($_REQUEST {__no_navigation} or $_REQUEST {__tree}) and return '';	
 
 	if ($preconf -> {core_show_dump}) {
 	
@@ -2355,25 +2365,13 @@ sub draw_menu {
 			check_href ($type);
 		}
 
-		my $classic_menu_style = ($_SKIN eq 'Eludia::Presentation::Skins::Classic' && $conf -> {classic_menu_style}) ? 1 : 0;
-
-		$type -> {onmouseout} = "menuItemOut ()" unless ($classic_menu_style);
+		$type -> {onmouseout} = "menuItemOut ()";
 
 		if (ref $type -> {items} eq ARRAY && !$_REQUEST {__edit}) {
 			$type -> {vert_menu} = draw_vert_menu ($type -> {name}, $type -> {items});
-			$type -> {onhover} = $classic_menu_style ? "open_popup_menu ('$$type{name}')" : "menuItemOver(this, '$$type{name}')";
+			$type -> {onhover} = "menuItemOver(this, '$$type{name}')";
 		} else {
-			$type -> {onhover} = $classic_menu_style ? <<EOJS : "menuItemOver(this)";
-			   if (last_vert_menu [0]) {
-
-					   for (var i = 0; i < last_vert_menu.length; i++) {
-							   if (last_vert_menu [i]) last_vert_menu [i].style.display = 'none';
-							   last_vert_menu [i] = null;
-						}
-
-			   };
-EOJS
-
+			$type -> {onhover} = "menuItemOver(this)";
 		}
 		
 		$type -> {side  } ||= 'left_items';
@@ -2393,9 +2391,7 @@ sub draw_vert_menu {
 
 	my ($name, $types, $level) = @_;
 	
-	my $classic_menu_style = ($_SKIN eq 'Eludia::Presentation::Skins::Classic' && $conf -> {classic_menu_style}) ? 1 : 0;
-
-	$level ||= $classic_menu_style ? 0 : 1;
+	$level ||= 1;
 	
 	$types = [grep {!$_ -> {off}} @$types];
 	
@@ -2407,22 +2403,14 @@ sub draw_vert_menu {
 			$type -> {name}     ||= '' . $type if $type -> {items};
 			$type -> {vert_menu}  = draw_vert_menu ($type -> {name}, $type -> {items}, $sublevel);
 
-			if ($classic_menu_style) {
-				$type -> {onclick}    = "open_popup_menu ('$$type{name}', $sublevel)";
-			} else {
-				$type -> {onhover} = "menuItemOver (this, '$$type{name}', '$name', $level)";
-				$type -> {onmouseout} = "menuItemOut ()";
-			}
+			$type -> {onhover} = "menuItemOver (this, '$$type{name}', '$name', $level)";
+			$type -> {onmouseout} = "menuItemOut ()";
 			
 		}
 		else {
 			
-			if ($classic_menu_style) {
-				$type -> {onhover}    = '';
-			} else {
-				$type -> {onhover}    = "menuItemOver (this, null, '$name', $level)";
-				$type -> {onmouseout} = "menuItemOut ()";
-			}
+			$type -> {onhover}    = "menuItemOver (this, null, '$name', $level)";
+			$type -> {onmouseout} = "menuItemOut ()";
 
 			$type -> {href}     ||= "/?type=$$type{name}";
 			$type -> {href}      .= "&role=$$type{role}" if $type -> {role};
@@ -2456,11 +2444,12 @@ sub draw_cells {
 	my $result = '';
 	
 	delete $options -> {href} if $options -> {is_total};
-	
-	
+		
 	if ($options -> {href}) {
 		check_href ($options) ;
 		$options -> {a_class} ||= 'row-cell';
+		$i -> {__href} ||= $options -> {href};
+		$i -> {__target} ||= $options -> {target};
 	}
 	
 	foreach my $cell (order_cells (@{$_[0]})) {
@@ -3009,6 +2998,91 @@ sub draw_table {
 
 ################################################################################
 
+sub draw_tree {
+
+	my ($node_callback, $list, $options) = @_;
+	
+	return '' if $options -> {off};
+	
+	push @{$_REQUEST{__include_js}}, 'dtree/dtree';
+	push @{$_REQUEST{__include_css}}, 'dtree/dtree';
+
+	$_REQUEST {__salt} ||= rand () * time ();
+
+	if (ref $options -> {title} eq HASH) {
+				
+			$options -> {title} -> {height} ||= 10;
+			$options -> {title} = draw_window_title ($options -> {title}) if $options -> {title} -> {label};
+		
+	}
+
+	my $n = 0;
+	my $root_cnt;
+
+	foreach our $i (@$list) {
+		$i -> {__n} = $n;		
+		
+		$i -> {__node} = &$node_callback ();
+	}
+	
+	
+	my $html = $_SKIN -> draw_tree ($node_callback, $list, $options);
+	
+	return $html;
+
+}
+
+################################################################################
+
+sub draw_node {
+
+	my $options = shift;
+	
+	my $result = '';
+	
+	$options -> {href} .= '&__tree=1';		
+	if ($options -> {href}) {
+		check_href ($options) ;
+	}
+	
+	$options -> {parent} = -1 if ($options -> {parent} == 0);
+	
+	my @buttons;
+	
+	foreach my $button (@{$_ [0]}) {
+	
+		next if $button -> {off};
+	
+		$button -> {href} .= '&__tree=1';		
+		check_href ($button);
+		
+		$button -> {target} ||= '_content_iframe';
+
+		if ($button -> {confirm}) {
+			my $salt = rand;
+			my $msg = js_escape ($options -> {confirm});
+			$button -> {href} =~ s{\%}{\%25}gsm; 		# wrong, but MSIE uri_unescapes the 1st arg of window.open :-(
+			$button -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$options{href}', '$button->{target}')} else {document.body.style.cursor = 'normal'; nop ();}];
+		}
+
+		check_title ($button, $i);
+		
+		push @buttons, $button; 
+	
+	}
+
+	$i -> {__menu} = draw_vert_menu ($i, \@buttons) 
+		if ((grep {$_ ne BREAK} @buttons) > 0);
+#	warn $options -> {__menu};
+#	warn "draw_node: " . Dumper ($options);
+		
+	return 	$_SKIN -> draw_node ($options, $i);
+	
+}
+
+
+################################################################################
+
 sub draw_tr {
 
 	### O B S O L E T E !!!
@@ -3112,7 +3186,7 @@ sub draw_page {
 		
 		undef $page -> {content};		
 		
-		eval { $page -> {content} = call_for_role ($selector)};
+		eval { $page -> {content} = call_for_role ($selector)} unless $_REQUEST {__only_menu};
 		
 		setup_skin ();
 
@@ -3147,7 +3221,8 @@ sub draw_page {
 				$_SKIN -> {subset} = $_SUBSET;
 				$_SKIN -> start_page ($page) if $_SKIN -> {options} -> {no_buffering};
 				$page  -> {auth_toolbar} = draw_auth_toolbar ();
-				$page  -> {body} 	 = call_for_role ($renderrer, $page -> {content}); 
+				$page  -> {body} 	 = call_for_role ($renderrer, $page -> {content}) unless $_REQUEST {__only_menu}; 
+				$page  -> {menu_data}    = Storable::dclone ($page -> {menu});
 				$page  -> {menu}         = draw_menu ($page -> {menu}, $page -> {highlighted_type}, {lpt => $lpt});
 			};
 

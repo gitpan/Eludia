@@ -280,48 +280,24 @@ function open_popup_menu (type, level) {
 		
 	if (!div) return;
 
-	if (classic_menu_style) {
-	
-		if (!level) level = 0;
-		
-		for (var i = level; i < last_vert_menu.length; i++) {
-			if (last_vert_menu [i]) last_vert_menu [i].style.display = 'none';
-			last_vert_menu [i] = null;
-		}
 
-		var mainMenuCell = document.getElementById ('main_menu_' + type);
-		
-		if (mainMenuCell) {
-			div.style.top  = mainMenuCell.offsetTop  + mainMenuCell.offsetParent.offsetTop  + mainMenuCell.offsetParent.offsetParent.offsetTop  + 16;
-			div.style.left = mainMenuCell.offsetLeft + mainMenuCell.offsetParent.offsetLeft + mainMenuCell.offsetParent.offsetParent.offsetLeft - 6;
-		}
-		else {
-			div.style.top  = event.y - 5 + document.body.scrollTop;
-			div.style.left = event.x - 5 + document.body.scrollLeft;
-		}
-		
-		last_vert_menu [level] = div;
-		
+	clearTimeout(timer);
+
+	if (!level) {
+		level = 1;
+		hideSubMenus (0);
 	} else {
-
-		clearTimeout(timer);
-
-		if (!level) {
-			level = 1;
-			hideSubMenus (0);
-		} else {
-			hideSubMenus (level);
-		}
-
-		div.style.top  = event.y - 5 + document.body.scrollTop;
-		div.style.left = event.x - 5 + document.body.scrollLeft;
-		
-
-		last_vert_menu [level] = {
-			div:	div,
-			td:		null
-		}	
+		hideSubMenus (level);
 	}
+
+	div.style.top  = event.y - 5 + document.body.scrollTop;
+	div.style.left = event.x - 5 + document.body.scrollLeft;
+	
+
+	last_vert_menu [level] = {
+		div:	div,
+		td:		null
+	}	
 
 	div.style.display = 'block';
 
@@ -456,10 +432,16 @@ function menuItemOut () {
 	timer = setTimeout('hideSubMenus(0)',delay);
 }
 
-function setVisible (id, isVisible, markSublevel) { 
-	document.getElementById (id).style.display = isVisible ? 'block' : 'none'
+function setVisible (id, isVisible, markSublevel) {
+	var object;
+	if (window.parent && window.parent.document.getElementById (id))
+		object = window.parent.document.getElementById (id);
+	else
+		object = document.getElementById (id);   		
+	 
+	object.style.display = isVisible ? 'block' : 'none'
         if (markSublevel && isVisible) {
-                var els = document.getElementById (id).children;
+                var els = object.children;
                 var hasChecked = false;
                 for (i = 0; i < els.length; i++) {
                         if (els[i].checked) {
@@ -478,7 +460,15 @@ function restoreSelectVisibility (name, rewind) {
 	setVisible (name + '_select', true);
 //	setVisible (name + '_iframe', false);
 	setVisible (name + '_div', false);
-	document.getElementById (name + '_iframe').src = '/0.html';
+	
+	var iframe;
+	if (window.parent && window.parent.document.getElementById (name + '_iframe'))
+		iframe = window.parent.document.getElementById (name + '_iframe');
+	else 
+		iframe = document.getElementById (name + '_iframe');
+	 	
+	iframe.src = '/0.html';
+	
 	if (rewind) {
 		document.getElementById (name + '_select').selectedIndex = 0;
 	}
@@ -487,13 +477,25 @@ function restoreSelectVisibility (name, rewind) {
 function setSelectOption (name, id, label) { 
 
 	restoreSelectVisibility (name, false);
-	var select = document.getElementById (name + '_select');
 	
+	var select;
+	var tree = 0;
+	
+	if (window.parent && window.parent.document.getElementById (name + '_select')) {
+			select = window.parent.document.getElementById (name + '_select')
+			tree = 1; 
+	} else 
+			select = document.getElementById (name + '_select') 
+
+			
 	for (var i = 0; i < select.options.length; i++) {
 		if (select.options [i].value == id) {
 			select.options [i].innerText = label;
 			select.selectedIndex = i;
-			window.focus ();
+			if (tree)
+				window.parent.focus ();
+			else 
+				window.focus ();
 			select.focus ();
 			if( select.onchange() ) select.onchange();
 			return;
@@ -505,7 +507,10 @@ function setSelectOption (name, id, label) {
 	option.innerText = label;
 	option.value = id;
 	select.selectedIndex = select.options.length - 1;
-	window.focus ();
+	if (tree)
+		window.parent.focus ();
+	else 
+		window.focus ();
 	select.focus ();
 	if( select.onchange() ) select.onchange();
 };
@@ -790,26 +795,6 @@ function msword_line (s) {
 	ms_word.Selection.InsertParagraph (); 
 	ms_word.Selection.Start = ms_word.Selection.End; 
 
-}
-
-function m_on (td) {
-	var cells = td.parentElement.cells;
-	for (var i = 0; i < cells.length; i++) {
-		if (cells [i].className != 'vert-menu') continue;
-		cells [i].style.background='#08246b';
-		cells [i].style.color='white';
-	}
-	blockEvent ();
-}
-
-function m_off (td) {
-	var cells = td.parentElement.cells;
-	for (var i = 0; i < cells.length; i++) {
-		if (cells [i].className != 'vert-menu') continue;
-		cells [i].style.background='#D6D3CE';
-		cells [i].style.color='black';
-	}
-	blockEvent ();
 }
 
 function check_popup_menus (event) {

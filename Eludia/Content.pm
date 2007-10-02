@@ -1888,7 +1888,7 @@ sub fill_in {
    			icon    => 'ok',
    			label   => 'ok',
    			hotkey  => {code => ENTER, ctrl => 1},
-   			confirm => 'confirm_ok',
+   			confirm => $conf -> {core_no_confirm_submit} ? undef : 'confirm_ok',
    		},
    		
    		cancel => {
@@ -2365,10 +2365,6 @@ sub get_page {}
 sub json_dump_to_function {
 
 	my ($name, $data) = @_;
-	
-	our $_JSON;
-	
-	$_JSON ||= JSON::XS -> new -> latin1 (1);
 
 	return "\n function $name () {\n return " . $_JSON -> encode ($data) . "\n}\n";
 

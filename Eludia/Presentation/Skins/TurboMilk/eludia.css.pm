@@ -15,7 +15,7 @@ div.table-container {
 /*
       	WIDTH: expression(document.body.offsetWidth - (window.name == '_body_iframe' ? 12 : 21));
 */      	
-      	WIDTH: expression(document.body.offsetWidth - 16);
+      	WIDTH: expression(document.body.offsetWidth - (window.name == '_content_iframe' ? 32 : 16));
       	PADDING-TOP: 0px;      	
       	
 	scrollbar-base-color:#d6d3ce;
@@ -438,9 +438,13 @@ td.vert-menu {
 	padding-top: 3px;
 	padding-bottom: 2px;
 
+	padding-left: 5px;
+	padding-right: 5px;
+
 	border-right:solid 1px #D6D3CE;
 	border-bottom:solid 1px #D6D3CE;
 
+	COLOR: #293869; 
 
 }
 .row-cell-transparent {
@@ -451,9 +455,13 @@ td.vert-menu {
 	padding-top: 3px;
 	padding-bottom: 2px;
 
+	padding-left: 5px;
+	padding-right: 5px;
+
 	border-right:solid 1px #D6D3CE;
 	border-bottom:solid 1px #D6D3CE;
 
+	COLOR: #293869; 
 
 }
 .row-button {
@@ -696,7 +704,7 @@ INPUT {
 }
 
 .cbx {
-	border: 0px none; 
+	border: 0px solid; 
 }
 
 SELECT {
@@ -714,12 +722,9 @@ input.form-active-inputs, select.form-active-inputs, textarea.form-active-inputs
 	COLOR: #000000; 
 	background-color: #ffffff;
 	FONT-FAMILY: Tahoma, 'MS Sans Serif';  
-	border-bottom: 2px ridge; 
-	border-right: 2px ridge; 
-	border-top: 2px inset; 
-	border-left: 2px inset;
-	padding-left: 1px;
-
+	border: 1px #7f9db9 solid;
+	padding-left: 3px;
+	padding-right: 3px;
 }
 
 td.toolbar {
@@ -764,3 +769,68 @@ div.grey-submit a {color:#222323;text-decoration:none;}
 div.grey-submit a:hover {color:#222323;text-decoration:underline;}
 
 .logon {font-family: Tahoma, Verdana, sans-serif;font-size:8pt;font-style:normal;font-weight: normal;color:#414141;text-decoration: none;}
+
+
+
+
+
+
+
+
+
+
+
+
+/*--------------------------------------------------|
+| dTree 2.05 | www.destroydrop.com/javascript/tree/ |
+|---------------------------------------------------|
+| Copyright (c) 2002-2003 Geir Landrö               |
+|--------------------------------------------------*/
+
+.dtree {
+	font-family: Verdana, Geneva, Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	_color: #666;
+	white-space: nowrap;
+	_float: left;
+
+
+      	PADDING-RIGHT: 0px;
+      	PADDING-LEFT: 0px;
+      	PADDING-BOTTOM: 0px;
+      	MARGIN: 0px;
+      	PADDING-TOP: 0px;      	
+      	
+	scrollbar-base-color:#d6d3ce;
+	scrollbar-arrow-color:#485f70;
+	scrollbar-3dlight-color: #efefef;
+	scrollbar-darkshadow-color:#b0b0b0;
+
+}
+.dtree img {
+	border: 0px;
+	vertical-align: middle;
+}
+.dtree a, a:visited, a:hover {
+	color: #333;
+	text-decoration: none;
+}
+
+.dtree a:active {
+	color: #596084;
+}
+
+.dtree a.node, .dtree a.nodeSel {
+	white-space: nowrap;
+	padding: 1px 2px 1px 2px;
+}
+.dtree a.node:hover, .dtree a.nodeSel:hover {
+	color: #333;
+	text-decoration: underline;
+}
+.dtree a.nodeSel {
+	background-color: #c0d2ec;
+}
+.dtree .clip {
+	overflow: hidden;
+}
