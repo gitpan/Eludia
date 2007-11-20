@@ -111,6 +111,7 @@ EOH
 		$subset_selector .= '</select></td>';
 	
 	}
+	$$options{user_label} =~ s/$i18n->{User}: //;
 	$$options{user_label} =~ s/(.+) (.).+ (.).+/$1 $2\.$3\./;
 #				<td class=bgr1><A class=lnk2>$calendar</A></td>
 	return <<EOH;
@@ -630,16 +631,39 @@ sub draw_form_field_select {
 		$options -> {other} -> {width}  ||= 600;
 		$options -> {other} -> {height} ||= 400;
 
-		$options -> {onChange} .= <<EOJS;
+		$options -> {no_confirm} ||= $conf -> {core_no_confirm_other};
 
-			if (this.options[this.selectedIndex].value == -1 && window.confirm ('$$i18n{confirm_open_vocabulary}')) {
-				switchDiv(); 
-				loadSlaveDiv('${$$options{other}}{href}&select=$$options{name}');
-			}
+		if ($options -> {no_confirm}) {
 
+			$options -> {onChange} .= <<EOJS;
+
+				if (this.options[this.selectedIndex].value == -1) {
+
+					switchDiv(); 
+					loadSlaveDiv('${$$options{other}}{href}&select=$$options{name}');
+
+				}
 EOJS
+		} else {
 
-	}		
+			$options -> {onChange} .= <<EOJS;
+
+				if (this.options[this.selectedIndex].value == -1) {
+
+					if (window.confirm ('$$i18n{confirm_open_vocabulary}')) {
+
+						switchDiv(); 
+						loadSlaveDiv('${$$options{other}}{href}&select=$$options{name}');
+
+					} else {
+
+						this.selectedIndex = 0;
+
+					}
+				}
+EOJS
+		}
+	}
 
 
 
@@ -1324,6 +1348,20 @@ EOH
 }
 
 ################################################################################
+
+sub draw_dump_button {
+
+	return {
+		label  => 'Dump',
+		name   => '_dump',
+		href   => create_url () . '&__dump=1',
+		side   => 'right_items',
+		target => '_blank',
+		no_off => 1,
+	};
+}
+
+################################################################################
 # MENUS
 ################################################################################
 
@@ -1555,7 +1593,7 @@ sub draw_row_button {
 		$options -> {label} = "\&nbsp;[$$options{label}]\&nbsp;";
 	}
 	
-	my $vert_line = {label => $options -> {label}, href => $options -> {href}};
+	my $vert_line = {label => $options -> {label}, href => $options -> {href}, target => $options -> {target}};
 	$vert_line -> {label} =~ s{[\[\]]}{}g;
 	push @{$_SKIN -> {__current_row} -> {__types}}, $vert_line;
 		

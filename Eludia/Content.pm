@@ -360,7 +360,8 @@ sub send_mail {
 	$options -> {content_type} ||= 'text/plain';
 	
 	if ($options -> {href}) {	
-		$options -> {href} =~ /^http/ or $options -> {href} = "http://$ENV{HTTP_HOST}" . $options -> {href};
+		my $server_name = $preconf -> {mail} -> {server_name} || $ENV{HTTP_HOST};
+		$options -> {href} =~ /^http/ or $options -> {href} = "http://$server_name" . $options -> {href};
 		$options -> {href} = "<br><br><a href='$$options{href}'>$$options{href}</a>" if $options -> {content_type} eq 'text/html';
 		$options -> {text} .= "\n\n" . $options -> {href};
 	}
@@ -374,8 +375,20 @@ sub send_mail {
 		
 		##### connecting...
 
-	my $smtp = Net::SMTP -> new ($preconf -> {mail} -> {host});
-	$smtp -> mail ($ENV{USER});
+	my $repeat = 10;
+	my $smtp = undef;
+	while ($repeat || !defined $smtp) {
+		$smtp = Net::SMTP -> new ($preconf -> {mail} -> {host});
+		$repeat--;
+	}	
+
+	unless (defined $smtp) {
+		warn "Can't connect to $preconf->{mail}->{host}\n";
+		return;
+	}
+
+#	$smtp -> mail ($ENV{USER});
+	$smtp -> mail ($options -> {from} -> {address});
 	$smtp -> to ($real_to);
 	$smtp -> data ();
 
@@ -397,17 +410,22 @@ $text
 EOT
 
 		##### sending attach
-		
-	if ($options -> {attach} && -f $options -> {attach} -> {real_path}) {
-	
-		my $type = $options -> {attach} -> {type};
-		$type ||= 'application/octet-stream';
-		
-		my $fn   = $options -> {attach} -> {file_name};
-		$fn ||= $options -> {attach} -> {real_path};
-		$fn =~ s{.*[\\\/]}{};
-		
-	$smtp -> datasend (<<EOT);
+
+
+	$options -> {attach} = [$options -> {attach}] if ($options -> {attach} && ref $options -> {attach} ne ARRAY);
+
+	foreach my $attach (@{$options -> {attach}}) {
+
+		if (-f $attach -> {real_path}) {
+
+			my $type = $attach -> {type};
+			$type ||= 'application/octet-stream';
+
+			my $fn   = $attach -> {file_name};
+			$fn ||= $attach -> {real_path};
+			$fn =~ s{.*[\\\/]}{};
+
+			$smtp -> datasend (<<EOT);
 --0__=4CBBE500DFA7329E8f9e8a93df938690918c4CBBE500DFA7329E
 Content-type: $type;
 	name="$fn"
@@ -416,19 +434,21 @@ Content-transfer-encoding: base64
 
 EOT
 
-	my $buf = '';
-	open (FILE, $options -> {attach} -> {real_path}) or die "Can't open ${$$options{attach}}{real_path}: $!";
-	while (read (FILE, $buf, 60*57)) {
-	       $smtp -> datasend (encode_base64 ($buf));
+			my $buf = '';
+			open (FILE, $attach -> {real_path}) or die "Can't open $attach->{real_path}: $!";
+			while (read (FILE, $buf, 60*57)) {
+				$smtp -> datasend (encode_base64 ($buf));
+			}
+			close (FILE);
+
+		}
+
 	}
-	close (FILE);
 
 	$smtp -> datasend (<<EOT);
 
 --0__=4CBBE500DFA7329E8f9e8a93df938690918c4CBBE500DFA7329E--
 EOT
-	
-	}
 
 	$smtp -> dataend ();
 	$smtp -> quit;
@@ -560,10 +580,11 @@ sub require_fresh {
 
 		die $@ if $@;
 
-		if ($file_name =~ /Config\.pm$/ && ! $conf -> {systables}) {
-        
-                    $conf -> {systables} = {
-	                    _db_model_checksums => '_db_model_checksums',
+		if ($file_name =~ /Config\.pm$/) {
+
+                    $conf -> {systables} ||= {
+			_db_model_checksums => '_db_model_checksums',
+			__voc_replacements		=> '__voc_replacements',
     	                __access_log            => '__access_log',
     	                __benchmarks            => '__benchmarks',
     	                __last_update           => '__last_update',
@@ -576,6 +597,12 @@ sub require_fresh {
     	                sessions                => 'sessions',
     	                users                   => 'users',
 		    };
+		    
+		    if ($model_update && !$model_update -> {core_ok}) {
+
+			sql_assert_core_tables ();
+
+		    }		    
 
 		}
 		if (
@@ -1084,13 +1111,20 @@ sub call_for_role {
 		$_REQUEST {__benchmarks_selected} = 0;
 	
 		my $result = &$name_to_call (@_);
-		
+
 		if ($preconf -> {core_debug_profiling} == 2) {
-			
+
+
 			sql_do (
-				"UPDATE $conf->{systables}->{__benchmarks} SET cnt = cnt + 1, ms = ms + ?, selected = selected + ?, mean = ms / cnt, mean_selected = selected / cnt WHERE id = ?",
+				"UPDATE $conf->{systables}->{__benchmarks} SET cnt = cnt + 1, ms = ms + ?, selected = selected + ?  WHERE id = ?",
 				1000 * (time - $time),
 				$_REQUEST {__benchmarks_selected},
+				sql_select_id ($conf->{systables}->{__benchmarks}, {fake => 0, label => $sub_name}, ['label']),
+			);
+
+			
+			sql_do (
+				"UPDATE $conf->{systables}->{__benchmarks} SET  mean = ms / cnt, mean_selected = selected / cnt WHERE id = ?",
 				sql_select_id ($conf->{systables}->{__benchmarks}, {fake => 0, label => $sub_name}, ['label']),
 			);
 			
@@ -1611,6 +1645,8 @@ sub select__info {
 				$imm == 240 ? 'NT 4.0 ' :
 				$imm == 250 ? '2000 ' :
 				$imm == 251 ? 'XP ' :
+				$imm == 252 ? '2003 ' :
+				$imm == 260 ? 'Vista ' :
 				"Unknown ($id . $major . $minor)"
 			) . $string . " Build $build"
 		};	
@@ -1656,7 +1692,7 @@ sub select__info {
 
 		{
 			id    => 'DB driver',
-			label => 'DBD::' . $SQL_VERSION -> {driver} . ' ' . ${'DBD::' . $SQL_VERSION -> {driver}.'::VERSION'},
+			label => 'DBD::' . $db -> {Driver} -> {Name} . ' ' . ${'DBD::' . $db -> {Driver} -> {Name} . '::VERSION'},
 			path  => $INC {'DBD/' . $SQL_VERSION -> {driver} . '.pm'},
 		},
 
@@ -1687,21 +1723,7 @@ sub select__info {
 			id    => 'Skin',
 			label => $_SKIN,
 			path  => $INC {$skin . '.pm'},
-		},
-				
-		
-#		{			
-#			id    => '$preconf',
-#			label => '<pre>' . Dumper ($preconf),
-#		},
-
-#		{			
-#			id    => '$conf',
-#			label => '<pre>' . Dumper ($conf),
-#		},
-		
-
-#		map {{id => $_, label => $ENV {$_}}} sort keys %ENV
+		},		
 
 	]	
 
@@ -2360,13 +2382,53 @@ sub get_item_of_ ($) {
 
 sub get_page {}
 
-################################################################################^M
+################################################################################
 
 sub json_dump_to_function {
 
 	my ($name, $data) = @_;
 
 	return "\n function $name () {\n return " . $_JSON -> encode ($data) . "\n}\n";
+
+}
+
+################################################################################
+
+sub attach_globals {
+
+	my ($from, $to, @what) = @_;
+	
+	$from =~ /::$/ or $from .= '::';
+	$to   =~ /::$/ or $to   .= '::';
+
+	*{"${to}$_"} = *{"${from}$_"} foreach (@what);
+
+}
+
+################################################################################
+
+sub prev_next_n {
+
+	my ($what, $where, $options) = @_;
+	
+	$options -> {field} ||= 'id';
+	
+	my $id = $what -> {$options -> {field}};
+
+	my ($prev, $next) = ();
+	
+	for (my $i = 0; $i < @$where; $i++) {
+
+		$where -> [$i] -> {$options -> {field}} == $id or next;
+		
+		$prev = $where -> [$i - 1] if $i;
+		$next = $where -> [$i + 1];
+		
+		return ($prev, $next, $i);
+	
+	}
+	
+	return ();
 
 }
 

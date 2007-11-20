@@ -20,6 +20,8 @@ sub format_picture {
 		$result =~ s{\d}{\*}g;
 	}
 	
+	$result =~ s{^\s+}{};
+
 	return $result;
 
 }
@@ -751,7 +753,7 @@ sub draw_auth_toolbar {
 
 	return $_SKIN -> draw_auth_toolbar ({
 		top_banner => ($conf -> {top_banner} ? interpolate ($conf -> {top_banner}) : ''),
-		user_label  => ($_REQUEST {__windows_ce} ? '' : $i18n -> {User} . ': ') . ($_USER -> {label} || $i18n -> {not_logged_in}),
+		user_label  => $i18n -> {User} . ': ' . ($_USER -> {label} || $i18n -> {not_logged_in}) . $_REQUEST{__add_user_label},
 	});
 			
 }
@@ -904,8 +906,10 @@ sub draw_form {
 	}
 	
 	$options -> {rows} = \@rows;
+	
+	$options -> {path} ||= $data -> {path};
 				
-	$options -> {path} = ($data -> {path} && !$_REQUEST{__no_navigation}) ? draw_path ($options, $data -> {path}) : '';
+	$options -> {path} = ($options -> {path} && !$_REQUEST{__no_navigation}) ? draw_path ($options, $options -> {path}) : '';
 	
 	delete $options -> {menu} if $_REQUEST {__edit};
 	if ($options -> {menu}) {	
@@ -1521,6 +1525,7 @@ sub draw_form_field_select {
 		check_href ($options -> {other});
 
 		$options -> {other} -> {href} =~ s{([\&\?])select\=\w+}{$1};
+		$options -> {other} -> {href} =~ s{([\&\?])__tree\=\w+}{$1};
 
 	}		
 
@@ -1875,61 +1880,13 @@ sub draw_toolbar_input_select {
 
 	if (defined $options -> {other}) {
 
-		ref $options -> {other} or $options -> {other} = {href => $options -> {other}};
-		
-		$options -> {other} -> {label} ||= $i18n -> {voc};
+		ref $options -> {other} or $options -> {other} = {href => $options -> {other}, label => $i18n -> {voc}};
 
 		check_href ($options -> {other});
 
 		$options -> {other} -> {href} =~ s{([\&\?])select\=\w+}{$1};
-		$options -> {other} -> {width}  ||= 600;
-		$options -> {other} -> {height} ||= 400;
-
-		$d_style_top = "d.style.top = " . (defined $options -> {other} -> {top} ? "${$$options{other}}{top};" : "this.offsetTop + this.offsetParent.offsetTop + this.offsetParent.offsetParent.offsetTop;");
-		$d_style_left = "d.style.left = " . (defined $options -> {other} -> {left} ? "${$$options{other}}{left};" : "this.offsetLeft + this.offsetParent.offsetLeft + this.offsetParent.offsetParent.offsetLeft;");
-
-#				d.style.top   = this.offsetTop + this.offsetParent.offsetTop + this.offsetParent.offsetParent.offsetTop;
-#				d.style.left  = this.offsetLeft + this.offsetParent.offsetLeft + this.offsetParent.offsetParent.offsetLeft;
-
-		my $onchange = $_REQUEST {__windows_ce} ? "switchDiv(); loadSlaveDiv('${$$options{other}}{href}&select=$$options{name}');" : <<EOS;
-				var fname = '_$$options{name}_iframe';
-				var f = document.getElementById (fname);
-
-				var dname = '_$$options{name}_div';
-				var d = document.getElementById (dname);
-
-				f.src = '${$$options{other}}{href}&select=$$options{name}';
-
-				$d_style_top
-				$d_style_left
-
-				d.style.display = 'block';
-				this.style.display = 'none';
-
-				d.focus ();
-EOS
-
-		$options -> {onChange} .= <<EOJS;
-
-			if (this.options[this.selectedIndex].value == -1 && window.confirm ('$$i18n{confirm_open_vocabulary}')) {
-				$onchange
-			}
-			else {
-				submit();
-			}
-
-EOJS
 
 	}		
-
-
-
-
-
-
-
-
-
 
 	return $_SKIN -> draw_toolbar_input_select ($options);
 	
@@ -1941,7 +1898,10 @@ sub draw_toolbar_input_checkbox {
 
 	my ($options) = @_;
 	
-	$options -> {checked} = $_REQUEST {$options -> {name}} ? 'checked' : '';
+	$options -> {checked} = (exists $options -> {checked} ? $options -> {checked} : $_REQUEST {$options -> {name}}) ? 'checked' : '';
+
+	$options -> {onClick} ||= 'submit();';
+	
 
 	return $_SKIN -> draw_toolbar_input_checkbox ($options);
 	
@@ -2085,7 +2045,7 @@ sub draw_centered_toolbar_button {
 	
 	if ($options -> {preset}) {
 		my $preset = $conf -> {button_presets} -> {$options -> {preset}};
-		$options -> {hotkey}     ||= Storable::dclone ($preset -> {hotkey});
+		$options -> {hotkey}     ||= Storable::dclone ($preset -> {hotkey}) if $preset -> {hotkey};
 		$options -> {icon}       ||= $preset -> {icon};
 		$options -> {label}      ||= $i18n -> {$preset -> {label}};
 		$options -> {label}      ||= $preset -> {label};
@@ -2291,19 +2251,14 @@ sub draw_menu {
 	my ($types, $cursor, $_options) = @_;
 	
 	@$types or return '';
-	
+
+	delete $_REQUEST {__tree} if $_REQUEST {__only_menu};	
+
 	($_REQUEST {__no_navigation} or $_REQUEST {__tree}) and return '';	
 
 	if ($preconf -> {core_show_dump}) {
 	
-		push @$types, {
-			label  => 'Dump',
-			name   => '_dump',
-			href   => create_url () . '&__dump=1',
-			side   => 'right_items',
-			target => '_blank',
-			no_off => 1,
-		};
+		push @$types, $_SKIN -> draw_dump_button();
 
 		push @$types, {
 			label  => 'Info',
@@ -2419,7 +2374,7 @@ sub draw_vert_menu {
 
 			$type -> {target}   ||= "_self";
 
-			$type -> {onclick} = $type -> {href} =~ /^javascript\:/i ? $' : "activate_link('$$type{href}', '$$type{target}')";  #'
+			$type -> {onclick} = $type -> {href} =~ /^javascript\:/i ? $' : "hideSubMenus(0); activate_link('$$type{href}', '$$type{target}')";  #'
 			$type -> {onclick} =~ s{[\n\r]}{}gsm;
 		}
 	
@@ -3004,9 +2959,6 @@ sub draw_tree {
 	
 	return '' if $options -> {off};
 	
-	push @{$_REQUEST{__include_js}}, 'dtree/dtree';
-	push @{$_REQUEST{__include_css}}, 'dtree/dtree';
-
 	$_REQUEST {__salt} ||= rand () * time ();
 
 	if (ref $options -> {title} eq HASH) {
@@ -3040,7 +2992,7 @@ sub draw_node {
 	
 	my $result = '';
 	
-	$options -> {href} .= '&__tree=1';		
+	$options -> {href} .= '&__tree=1' unless ($options -> {no_tree});		
 	if ($options -> {href}) {
 		check_href ($options) ;
 	}
@@ -3060,9 +3012,9 @@ sub draw_node {
 
 		if ($button -> {confirm}) {
 			my $salt = rand;
-			my $msg = js_escape ($options -> {confirm});
+			my $msg = js_escape ($button -> {confirm});
 			$button -> {href} =~ s{\%}{\%25}gsm; 		# wrong, but MSIE uri_unescapes the 1st arg of window.open :-(
-			$button -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$options{href}', '$button->{target}')} else {document.body.style.cursor = 'normal'; nop ();}];
+			$button -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$button{href}', '$$button{target}')} else {document.body.style.cursor = 'normal'; nop ();}];
 		}
 
 		check_title ($button, $i);
@@ -3188,6 +3140,8 @@ sub draw_page {
 		
 		eval { $page -> {content} = call_for_role ($selector)} unless $_REQUEST {__only_menu};
 		
+		warn $@ if $@;
+		
 		setup_skin ();
 
 		$_REQUEST {__read_only} = 0 if ($_REQUEST {__only_field});
@@ -3243,6 +3197,7 @@ sub draw_page {
 
 		if ($_REQUEST {error} =~ s{^\#(\w+)\#\:}{}) {
 			$page -> {error_field} = $1;
+			($_REQUEST {error}) = split / at/sm, $_REQUEST {error}; 
 		}
 
 		setup_skin ();

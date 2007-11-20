@@ -757,5 +757,40 @@ sub download_table_data {
 	lrt_ok ();
 
 }
+################################################################################
+
+sub sql_select_loop {
+
+	my ($sql, $coderef, @params) = @_;
+	$sql =~ s{^\s+}{};
+
+	my $st = $db -> prepare ($sql);
+	$st -> execute (@params);
+	
+	our $i;
+	while ($i = $st -> fetchrow_hashref) {
+		lc_hashref ($i)
+			if (exists $$_PACKAGE {'lc_hashref'});
+		&$coderef ();
+	}
+	
+	$st -> finish ();
+
+}
+################################################################################
+
+sub sql_select_ids {
+	my ($sql, @params) = @_;
+
+	my @ids = grep {$_ > 0} sql_select_col ($sql, @params);
+	push @ids, -1;
+
+	foreach my $parameter (@params) {
+		$sql =~ s/\?/'$parameter'/ism;
+	}
+
+	return wantarray ? (join(',', @ids), join(',', @ids)) : join(',', @ids);
+}
+
 
 1;

@@ -87,6 +87,27 @@ my $time = time;
 print STDERR "sql_assert_core_tables [$$] started...\n";
 
 	my %defs = (
+
+		$conf -> {systables} -> {__voc_replacements} => {
+		
+			columns => {
+				id         => {TYPE_NAME => 'bigint', _EXTRA => 'auto_increment', _PK => 1},
+				table_name => {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
+				object_name => {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
+				object_type => {TYPE_NAME => 'int', COLUMN_SIZE => 1},
+			},
+			
+			keys => {
+				ix => 'table_name',
+				ix2 => 'object_name',
+			},
+
+		},
+	);
+
+	$model_update -> assert (tables => \%defs);
+
+	my %defs = (
 	
 		$conf -> {systables} -> {__access_log} => {
 		
@@ -206,7 +227,7 @@ print STDERR "sql_assert_core_tables [$$] started...\n";
 				type =>   {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
 				action => {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
 				error  => {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
-				params => {TYPE_NAME => 'text'},
+				params => {TYPE_NAME => 'longtext'},
 				dt     => {TYPE_NAME => 'timestamp'},
 				mac    => {TYPE_NAME  => 'varchar', COLUMN_SIZE => 17},
 			}
@@ -258,8 +279,9 @@ print STDERR "sql_assert_core_tables [$$] started...\n";
 	};
 
 	$model_update -> assert (tables => \%defs);
-	
+
 	$model_update -> {core_ok} = 1;
+	
 	
 print STDERR "sql_assert_core_tables [$$] finished:" . (time - $time) . " ms\n";	
 	
@@ -346,7 +368,6 @@ sub sql_is_temporal_table {
 
 sub sql_reconnect {
 
-
 	if ($db && $model_update && $model_update -> {core_ok}) {
 		my $ping = $db -> ping;
 		return if $ping;
@@ -354,12 +375,10 @@ sub sql_reconnect {
 	
 	$conf = {%$conf, %$preconf};
 
-#   	$conf -> {dbf_dsn} and our $dbf = DBI -> connect ($conf -> {dbf_dsn}, {RaiseError => 1});
-
-	our $db  = DBI -> connect ($conf -> {'db_dsn'}, $conf -> {'db_user'}, $conf -> {'db_password'}, {
+	our $db = DBI -> connect ($conf -> {'db_dsn'}, $conf -> {'db_user'}, $conf -> {'db_password'}, {
 		RaiseError  => 1, 
 		AutoCommit  => 1,
-		LongReadLen => 100000000,
+		LongReadLen => 1000000,
 		LongTruncOk => 1,
 		InactiveDestroy => 0,
 	});
@@ -379,18 +398,22 @@ sub sql_reconnect {
 	
 		our $model_update = DBIx::ModelUpdate -> new (		
 			$db, 
-			dump_to_stderr => 1,
-			before_assert	=> $conf -> {'db_temporality'} ? \&sql_temporality_callback : undef,
+			dump_to_stderr 		=> 1,
+			before_assert		=> $conf -> {'db_temporality'} ? \&sql_temporality_callback : undef,
 			schema			=> $preconf -> {db_schema},
 			_db_model_checksums	=> $conf -> {systables} -> {_db_model_checksums}, 
+			__voc_replacements	=> $conf -> {systables} -> {__voc_replacements}, 
+			core_voc_replacement_use=> $conf -> {core_voc_replacement_use},
 		);
 
-		sql_assert_core_tables (); # unless $driver_name eq 'Oracle';
-		
 		$preconf -> {no_model_update} = 1;
 		
 	}
-		
+	
+	if ($driver_name =~ m/ORACLE/i) {
+		sql_do ("ALTER SESSION SET NLS_NUMERIC_CHARACTERS='.,' TIME_ZONE = '+4:00' NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'");		
+	}
+
 	our %sts = ();
 
 }   	
@@ -459,19 +482,10 @@ sub sql_select_vocabulary {
 
 ################################################################################
 
-sub sql_select_ids {
-	my ($sql, @params) = @_;
-	my @ids = grep {$_ > 0} sql_select_col ($sql, @params);
-	push @ids, -1;
-	return join ',', @ids;
-}
-
-################################################################################
-
 sub sql_select_id {
 
 	my ($table, $values, @lookup_field_sets) = @_;
-	
+
 	my %values = ();
 	
 	my $forced = {};
@@ -738,23 +752,5 @@ EOS
 
 ################################################################################
 	
-sub sql_select_loop {
-
-	my ($sql, $coderef, @params) = @_;
-	$sql =~ s{^\s+}{};
-	
-	my $st = $db -> prepare ($sql);
-	$st -> execute (@params);
-	
-	our $i;
-	while ($i = $st -> fetchrow_hashref) {
-		lc_hashref ($i)
-			if (exists $$_PACKAGE {'lc_hashref'});
-		&$coderef ();
-	}
-	
-	$st -> finish ();
-
-}
 
 1;

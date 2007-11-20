@@ -23,6 +23,8 @@ var typeAheadInfo = {last:0,
 };
 var kb_hooks = [{}, {}, {}, {}];
 
+var max_len = 50;
+
 function handle_hotkey_focus    (r) {document.form.elements [r.data].focus ()}
 function handle_hotkey_focus_id (r) {document.getElementById (r.data).focus ()}
 function handle_hotkey_href     (r) {
@@ -46,7 +48,13 @@ function nope (a1, a2, a3) {
 function nop () {}
 
 function check_menu_md5 (menu_md5) {
-	if (window.parent.menu_md5 == menu_md5) return;	
+
+	window.parent.subsets_are_visible = 0;
+
+	var url = window.parent.location.href;
+
+	if (window.parent.menu_md5 == menu_md5 || url.indexOf ('dialog.html') > 0) return;	
+
 	var href = window.location.href + '&__only_menu=1';
 	nope (href, 'invisible', '');	
 }
@@ -263,12 +271,19 @@ function UpdateClock() {
 	   document.getElementById ('clock_hours').innerText = twoDigits (tDate.getHours ());
 	   document.getElementById ('clock_minutes').innerText = twoDigits (tDate.getMinutes ());
 	   document.getElementById ('clock_separator').innerText = clockSeparators [tDate.getSeconds () % 2];
-	   clockSeparatorID = 1 - clockSeparatorID;
+	   
+	   
    } catch (e) {}
 
-   clockSeparatorID = 1 - clockSeparatorID;
+	if (tDate.getSeconds () % 2) {
 
-   clockID = setTimeout("UpdateClock ()", 500);
+	   for (var i in every_second) { 
+	   	document.frames ['_every_second_' + i].location.replace (every_second [i] + '&salt=' + Math.random ()); 
+	   }
+	   
+	}
+
+   clockID = setTimeout ("UpdateClock ()", 500);
 
 }
 
@@ -496,7 +511,9 @@ function restoreSelectVisibility (name, rewind) {
 };
 
 function setSelectOption (select, id, label) { 
-	
+
+	label = label.length <= max_len ? label : (label.substr (0, max_len - 3) + '...');
+
 	for (var i = 0; i < select.options.length; i++) {
 		if (select.options [i].value == id) {
 			select.options [i].innerText = label;
@@ -2888,9 +2905,9 @@ dTree.prototype.node = function(node, nodeId) {
 
 		if (this.config.useStatusText) str += ' onmouseover="window.status=\'' + node.name + '\';return true;" onmouseout="window.status=\'\';return true;" ';
 
-		if (node.context_menu) str += ' oncontextmenu="if (!edit_mode) {d.openTo (' + nodeId + ', true, true); open_popup_menu(\'' + node.context_menu + '\'); blockEvent ();}"';
+		if (node.context_menu) str += ' oncontextmenu="d.openTo (' + nodeId + ', true, true); open_popup_menu(\'' + node.context_menu + '\'); blockEvent ();"';
 		
-//		if (this.config.useSelection && ((node._hc && this.config.folderLinks) || !node._hc)) str += ' onclick="javascript: var edit_mode = check_edit_mode (); if (!edit_mode) ' + this.obj + '.s(' + nodeId + '); return !edit_mode;"';
+		if (this.config.useSelection && ((node._hc && this.config.folderLinks) || !node._hc)) str += ' onclick="javascript: ' + this.obj + '.s(' + nodeId + '); "';
 
 		str += '>';
 

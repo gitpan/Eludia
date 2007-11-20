@@ -783,15 +783,38 @@ sub draw_form_field_select {
 			
 EOS
 
-		$options -> {onChange} .= <<EOJS;
+		$options -> {no_confirm} ||= $conf -> {core_no_confirm_other};
 
-			if (this.options[this.selectedIndex].value == -1 && window.confirm ('$$i18n{confirm_open_vocabulary}')) {
-				$onchange
-			}
+		if ($options -> {no_confirm}) {
+
+			$options -> {onChange} .= <<EOJS;
+
+				if (this.options[this.selectedIndex].value == -1) {
+
+					$onchange
+
+				}
 
 EOJS
+		} else {
 
-	}		
+			$options -> {onChange} .= <<EOJS;
+
+				if (this.options[this.selectedIndex].value == -1) {
+
+					if (window.confirm ('$$i18n{confirm_open_vocabulary}')) {
+
+						$onchange
+
+					} else {
+
+						this.selectedIndex = 0;
+
+					}
+				}
+EOJS
+		}
+	}
 
 
 
@@ -1514,6 +1537,20 @@ EOH
 }
 
 ################################################################################
+
+sub draw_dump_button {
+
+	return {
+		label  => 'Dump',
+		name   => '_dump',
+		href   => create_url () . '&__dump=1',
+		side   => 'right_items',
+		target => '_blank',
+		no_off => 1,
+	};
+}
+
+################################################################################
 # MENUS
 ################################################################################
 
@@ -1829,7 +1866,7 @@ sub draw_row_button {
 		$options -> {label} = "\&nbsp;[$$options{label}]\&nbsp;";
 	}
 	
-	my $vert_line = {label => $options -> {label}, href => $options -> {href}};
+	my $vert_line = {label => $options -> {label}, href => $options -> {href}, target => $options -> {target}};
 	$vert_line -> {label} =~ s{[\[\]]}{}g;
 	push @{$_SKIN -> {__current_row} -> {__types}}, $vert_line;
 		
