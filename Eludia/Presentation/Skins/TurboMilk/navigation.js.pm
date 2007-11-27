@@ -47,6 +47,44 @@ function nope (a1, a2, a3) {
 
 function nop () {}
 
+function ancestor_window_with_child (id) {
+
+	var w = window;
+	var m = null;
+	var tries = 20;
+		
+	while (tries && w && !m) {
+		w = w.parent;
+		m = w.document.getElementById (id);
+		tries --;
+	}
+
+	if (!m) return null;
+	
+	return {
+		window: w,
+		child:  m
+	};
+
+}
+
+function _dumper_href () {
+
+	var wf = ancestor_window_with_child ('_body_iframe');
+
+	if (!wf) return alert ('_body_iframe not found :-((');
+
+	var body_iframe    = wf.child.contentWindow; 
+	var content_iframe = body_iframe.document.getElementById ('_content_iframe');
+
+	var href = content_iframe ? content_iframe.contentWindow.location.href : body_iframe.location.href;
+
+	nope (href + '&__dump=1', '_blank', 'statusbar,scrollbars');
+
+	document.body.style.cursor = 'default';
+
+}
+
 function check_menu_md5 (menu_md5) {
 
 	window.parent.subsets_are_visible = 0;
@@ -97,7 +135,7 @@ function idx_tables (__scrollable_table_row) {
 	if (!scrollable_table) return;
 
 	scrollable_table          = scrollable_table.tBodies (0);
-	scrollable_table_row      = __scrollable_table_row;
+	if (__scrollable_table_row < scrollable_rows.length) scrollable_table_row = __scrollable_table_row;
 	scrollable_table_row_cell = 0;
 
 	if (scrollable_rows.length > 0) {
@@ -509,6 +547,19 @@ function restoreSelectVisibility (name, rewind) {
 		document.getElementById (name + '_select').selectedIndex = 0;
 	}
 };
+
+function invoke_setSelectOption (a) {
+
+	if (window.confirm (a.question)) {	
+		var ws = ancestor_window_with_child ('__body_iframe');		
+		if (ws) ws.window._setSelectOption (a.id, a.label);
+	} 
+	else {
+		document.body.style.cursor = 'normal'; 
+		nop ();
+	};
+
+}
 
 function setSelectOption (select, id, label) { 
 

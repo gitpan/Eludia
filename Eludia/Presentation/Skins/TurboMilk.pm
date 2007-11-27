@@ -1521,7 +1521,7 @@ sub draw_dump_button {
 	return {
 		label  => 'Dump',
 		name   => '_dump',
-		href   => "javascript: var body_iframe = top.document.getElementById('_body_iframe').contentWindow; var content_iframe = body_iframe.document.getElementById('_content_iframe'); nope((content_iframe ? content_iframe.contentWindow.location.href : body_iframe.location.href) + '&__dump=1', '_blank', 'statusbar,scrollbars')",
+		href   => "javascript:_dumper_href();",
 		side   => 'right_items',
 		no_off => 1,
 
@@ -1671,10 +1671,18 @@ sub js_set_select_option {
 	return ($fallback_href || $i) unless $_REQUEST {select};
 	my $question = js_escape ($i18n -> {confirm_close_vocabulary} . ' ' . $item -> {label} . '?');
 	$name ||= '_' . $_REQUEST {select};
+	
+	my $a = $_JSON -> encode ({
+		question => "$i18n->{confirm_close_vocabulary} \"$item->{label}\"?",
+		id       => $item -> {id},
+		label    => $item -> {label},
+	});
+	
+	my $var = "sso_$item->{id}";
+	
+	$_REQUEST {__script} .= " var $var = $a; ";
 
-	my $label = js_escape ($item -> {label});
-
-	return qq|javaScript:if (window.confirm ($question)) {top._setSelectOption ($item->{id}, $label)} else {document.body.style.cursor = 'normal'; nop ();}|;
+	return "javaScript:invoke_setSelectOption ($var)";
 
 }
 
@@ -1686,6 +1694,7 @@ sub draw_text_cell {
 	
 	my $html = "\n\t<td ";
 	$html .= dump_attributes ($data -> {attributes}) if $data -> {attributes};
+	$html .= ' style="padding-left:' . ($data -> {level} * 15 + 3) . '"' if (defined $data -> {level});
 	$html .= '>';
 	
 	$data -> {off} = 1 unless $data -> {label} =~ /\S/;
@@ -1997,23 +2006,21 @@ sub draw_page {
 
 		return <<EOH;
 <html>
-	<script for=window event=onload>
-		
-		var w = window;
-		var m = null;
-		
-		while (w && !m) {
-			w = w.parent;
-			m = w.document.getElementById ('main_menu');
-		}
-	
-		if (m) {
-			var a = $a;
-			m.outerHTML = a[0];
-			w.menu_md5 = '$menu_md5';
-		}
-		
-	</script>
+	<head>
+		<script src="$_REQUEST{__static_url}/navigation.js?$_REQUEST{__static_salt}">
+		</script>
+		<script for=window event=onload>
+
+			var wm = ancestor_window_with_child ('main_menu');
+
+			if (wm) {
+				var a = $a;
+				wm.child.outerHTML = a [0];
+				wm.window.menu_md5 = '$menu_md5';
+			}
+
+		</script>
+	<head>
 	<body>
 	</body>
 </html>
@@ -2633,7 +2640,7 @@ EOH
 			</frame>
 			<frame src="${\($selected_node_url ? $selected_node_url : '$_REQUEST{__static_url}/0.html')}" name="_content_iframe" id="__content_iframe" application="yes" scroll=no>
 			</frame>
-		<frameset>
+		</frameset>
 EOH
 	
 	my $menus;
