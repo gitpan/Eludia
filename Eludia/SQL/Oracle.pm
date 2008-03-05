@@ -107,21 +107,15 @@ sub sql_prepare {
 sub sql_do {
 
 	my ($sql, @params) = @_;
+	
+	my $time = time;
 
 	my $st = sql_prepare ($sql);
 
-#	eval {
-		$st -> execute (@params);
-		$st -> finish;	
-#	};
+	my $affected = $st -> execute (@params);
+	$st -> finish;	
 
-#	if ($@ && $@ =~ /ORA\-02292/) {	
-#		$_REQUEST {error} = 'Нарушено ограничение целостности. Операция недопустима.';	
-#	} 
-#	elsif ($@) {
-#		die $@;
-#	}
-	
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => $affected});	
 }
 
 ################################################################################
@@ -129,7 +123,9 @@ sub sql_do {
 sub sql_execute_procedure {
 
 	my ($sql, @params) = @_;
-	
+
+	my $time = time;	
+
 	$sql .= ';' unless $sql =~ /;[\n\r\s]*$/;
 	
 	my $st = sql_prepare ($sql);
@@ -149,6 +145,7 @@ sub sql_execute_procedure {
 		$st -> execute;
 	};
 	
+
 	if ($@) {
 		local $SIG {__DIE__} = 'DEFAULT';
 		if ($@ =~ /ORA-\d+:(.*)/) {
@@ -158,8 +155,10 @@ sub sql_execute_procedure {
 		}
 		
 	}
-	
+
 	$st -> finish;	
+
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => 0});	
 	
 }
 
@@ -205,6 +204,8 @@ sub sql_select_all_cnt {
 		return ($result, $cnt);
 	}
 
+	my $time = time;	
+
 	my $st = sql_prepare ($sql);
 
 
@@ -225,6 +226,7 @@ sub sql_select_all_cnt {
 	
 	$st -> finish;
 
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => @result + 0});	
 
 
 	$sql =~ s{ORDER BY.*}{}ism;
@@ -237,7 +239,7 @@ sub sql_select_all_cnt {
 		$cnt = (@$temp + 0);
 	}
 	else {
-		$sql =~ s/SELECT.*?FROM/SELECT COUNT(*) FROM/ism;
+		$sql =~ s/SELECT.*?[\n\s]+FROM[\n\s]+/SELECT COUNT(*) FROM /ism;
 		$cnt = sql_select_scalar ($sql, @params);
 	}
 			
@@ -276,6 +278,7 @@ sub sql_select_all {
 			
 	}
 
+	my $time = time;	
 
 	if ($sql =~ s{LIMIT\s+(\d+)\s*\,\s*(\d+).*}{}ism) {
 
@@ -314,6 +317,8 @@ sub sql_select_all {
 		$st -> finish;
         }
 	
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => @$result + 0});	
+
 	foreach my $i (@$result) {
 		lc_hashref ($i);
 	}
@@ -351,7 +356,9 @@ sub sql_select_all_hash {
 
 	my $result = {};
 
-	$sql = mysql_to_oracle($sql) if($conf -> {core_auto_oracle});
+	$sql = mysql_to_oracle ($sql) if ($conf -> {core_auto_oracle});
+
+	my $time = time;	
 
 	my $st = $db -> prepare ($sql);
 	$st -> execute (@params);
@@ -362,6 +369,7 @@ sub sql_select_all_hash {
 	}
 	
 	$st -> finish;
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => (keys %$result) + 0});	
 
 	return $result;
 
@@ -379,6 +387,8 @@ sub sql_select_col {
 	if ($sql =~ m/\bLIMIT\s+\d+\s*$/igsm) {
 		$sql =~ s/\bLIMIT\s+(\d+)\s*$/LIMIT 0,$1/igsm;
 	}
+
+	my $time = time;	
 
 	if ($sql =~ s{LIMIT\s+(\d+)\s*\,\s*(\d+).*}{}ism) {
 		my ($start, $portion) = ($1, $2);
@@ -411,6 +421,8 @@ sub sql_select_col {
 		}
 		$st -> finish;
 	}
+
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => @result + 0});	
 	
 	return @result;
 
@@ -439,7 +451,10 @@ sub lc_hashref {
 			delete $hr -> {uc $key};
 		}
 	}
-	
+
+	delete $hr -> {REWBFHHHKGKGLLD};
+	delete $hr -> {NBHCQQEHGDFJFXF};
+
 	return $hr;
 
 }
@@ -471,10 +486,14 @@ sub sql_select_hash {
 		
 	}	
 	
+	my $time = time;	
+
 	my $st = sql_prepare ($sql_or_table_name);
 	$st -> execute (@params);
 	my $result = $st -> fetchrow_hashref ();
 	$st -> finish;		
+
+	__log_sql_profilinig ({time => $time, sql => $sql_or_table_name, selected => 1});	
 	
 	return lc_hashref ($result);
 
@@ -486,10 +505,16 @@ sub sql_select_array {
 
 	my ($sql, @params) = @_;
 
+	$sql =~ s/\bLIMIT\s+\d+\s*$//igsm;
+
+	my $time = time;	
+
 	my $st = sql_prepare ($sql);
 	$st -> execute (@params);
 	my @result = $st -> fetchrow_array ();
 	$st -> finish;
+
+	__log_sql_profilinig ({time => $time, sql => $sql_or_table_name, selected => 1});	
 	
 	return wantarray ? @result : $result [0];
 
@@ -506,6 +531,8 @@ sub sql_select_scalar {
 	if ($sql =~ m/\bLIMIT\s+\d+\s*$/igsm) {
 		$sql =~ s/\bLIMIT\s+(\d+)\s*$/LIMIT 0,$1/igsm;
 	}
+
+	my $time = time;	
 
 	if ($sql =~ s{LIMIT\s+(\d+)\s*\,\s*(\d+).*}{}ism) {
 
@@ -540,6 +567,8 @@ sub sql_select_scalar {
 		$st -> finish;
 	}
 	
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => 1});	
+
 	return $result [0];
 
 }
@@ -675,31 +704,29 @@ EOS
 
 	}
 
-	my $id_value;
-
 	foreach my $field (keys %$pairs) { 
 		my $comma = @params ? ', ' : '';	
-		unless (exists($DB_MODEL->{tables}->{$table_name}->{columns}->{$field}->{NULLABLE})) {
-			$fields .= "$comma $field";
-			$args   .= "$comma ?";
-			if (exists($DB_MODEL->{tables}->{$table_name}->{columns}->{$field}->{COLUMN_DEF}) && !($pairs -> {$field})) {
-				push @params, $DB_MODEL->{tables}->{$table_name}->{columns}->{$field}->{COLUMN_DEF};
-			}
-			else {
-				push @params, $pairs -> {$field};	
-			}
-			$id_value = $pairs -> {$field} if (uc $field eq 'ID');
- 		}
+		
+		$fields .= "$comma $field";
+		$args   .= "$comma ?";
+
+		if (exists($DB_MODEL->{tables}->{$table_name}->{columns}->{$field}->{COLUMN_DEF}) && !($pairs -> {$field})) {
+			push @params, $DB_MODEL->{tables}->{$table_name}->{columns}->{$field}->{COLUMN_DEF};
+		}
+		else {
+			push @params, $pairs -> {$field};	
+		}
+ 		
 	}
 
 	if ($conf -> {core_voc_replacement_use}) {	
 		my $seq_name ='SEQ_';
 		my $curval;
 
-		if ($id_value) {
+		if ($pairs -> {id}) {
 			$seq_name .= sql_select_scalar("SELECT id FROM $conf->{systables}->{__voc_replacements} WHERE table_name='$table_name' and object_type=2");
 			$curval = sql_select_scalar("SELECT LAST_NUMBER FROM user_sequences WHERE SEQUENCE_NAME='$seq_name'");
-			my $step = $id_value - $curval;
+			my $step = $pairs -> {id} - $curval;
 	 		if ($step > 1) {
 				sql_do("ALTER SEQUENCE $seq_name INCREMENT BY $step");
 			        sql_select_scalar("SELECT $seq_name.nextval FROM DUAL");
@@ -709,7 +736,10 @@ EOS
 		}
 	}
 
-	my $st = sql_prepare ("INSERT INTO $table_name ($fields) VALUES ($args) RETURNING id INTO ?");
+	my $time = time;
+	
+	my $sql = "INSERT INTO $table_name ($fields) VALUES ($args) RETURNING id INTO ?";
+	my $st = sql_prepare ($sql);
 
 	my $i = 1; 
 	$st -> bind_param ($i++, $_)
@@ -720,6 +750,8 @@ EOS
 	
 	$st -> execute;
 	$st -> finish;	
+
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => 1});	
 
 	return $id;
 		
@@ -777,13 +809,73 @@ sub sql_download_file {
 	
 	$_REQUEST {id} ||= $_PAGE -> {id};
 	
-	my $r = sql_select_hash ("SELECT * FROM $$options{table} WHERE id = ?", $_REQUEST {id});
-	$options -> {path} = $r -> {$options -> {path_column}};
-	$options -> {type} = $r -> {$options -> {type_column}};
-	$options -> {file_name} = $r -> {$options -> {file_name_column}};
+	my $item = sql_select_hash ("SELECT * FROM $$options{table} WHERE id = ?", $_REQUEST {id});
+	$options -> {size} = $item -> {$options -> {size_column}};
+	$options -> {path} = $item -> {$options -> {path_column}};
+	$options -> {type} = $item -> {$options -> {type_column}};
+	$options -> {file_name} = $item -> {$options -> {file_name_column}};	
 	
-	download_file ($options);
+	if ($options -> {body_column}) {
+
+		my $time = time;
+		
+		my $sql = "SELECT $options->{body_column} FROM $options->{table} WHERE id = ?";
+		my $st = $db -> prepare ($sql, {ora_auto_lob => 0});
+		$st -> execute ($_REQUEST {id});
+		(my $lob_locator) = $st -> fetchrow_array ();
+
+		my $chunk_size = 1034;
+		my $offset = 1 + download_file_header (@_);
+		
+		while (my $data = $db -> ora_lob_read ($lob_locator, $offset, $chunk_size)) {
+		      $r -> print ($data);
+		      $offset += $chunk_size;
+		}
+
+		$st -> finish ();
+
+		__log_sql_profilinig ({time => $time, sql => $sql, selected => 1});	
+
+	}
+	else {
+		download_file ($options);
+	}
+
+}
+
+################################################################################
+
+sub sql_store_file {
+
+	my ($options) = @_;
+
+	my $st = $db -> prepare ("SELECT $options->{body_column} FROM $options->{table} WHERE id = ? FOR UPDATE", {ora_auto_lob => 0});
+
+	$st -> execute ($options -> {id});
+	(my $lob_locator) = $st -> fetchrow_array ();
+	$st -> finish ();
 	
+	$db -> ora_lob_trim ($lob_locator, 0);
+
+	$options -> {chunk_size} ||= 4096; 
+	my $buffer = '';		
+		
+	open F, $options -> {real_path} or die "Can't open $options->{real_path}: $!\n";
+		
+	while (read (F, $buffer, $options -> {chunk_size})) {
+		$db -> ora_lob_append ($lob_locator, $buffer);
+	}
+
+	sql_do (
+		"UPDATE $$options{table} SET $options->{size_column} = ?, $options->{type_column} = ?, $options->{file_name_column} = ? WHERE id = ?",
+		-s $options -> {real_path},
+		$options -> {type},
+		$options -> {file_name},
+		$options -> {id},
+	);
+
+	close F;
+
 }
 
 ################################################################################
@@ -791,10 +883,24 @@ sub sql_download_file {
 sub sql_upload_file {
 	
 	my ($options) = @_;
+	
+	$options -> {id} ||= $_REQUEST {id};
 
 	my $uploaded = upload_file ($options) or return;
 	
-	sql_delete_file ($options);
+	$options -> {body_column} or sql_delete_file ($options);
+						
+	if ($options -> {body_column}) {
+	
+		$options -> {real_path} = $uploaded -> {real_path};
+		
+		sql_store_file ($options);
+	
+		unlink $uploaded -> {real_path};
+
+		delete $uploaded -> {real_path};
+
+	}
 	
 	my (@fields, @params) = ();
 	
@@ -808,12 +914,14 @@ sub sql_upload_file {
 		push @fields, "$field = ?";
 		push @params, $options -> {add_columns} -> {$field};
 	}
+
+	if (@fields) {
 	
-	@fields or return;
+		my $tail = join ', ', @fields;
+
+		sql_do ("UPDATE $$options{table} SET $tail WHERE id = ?", @params, $options -> {id});
 	
-	my $tail = join ', ', @fields;
-		
-	sql_do ("UPDATE $$options{table} SET $tail WHERE id = ?", @params, $_REQUEST {id});
+	}
 	
 	return $uploaded;
 	
@@ -834,6 +942,8 @@ sub sql_select_loop {
 	$sql =~ s{^\s+}{};
 
 	$sql = mysql_to_oracle($sql) if($conf -> {core_auto_oracle});
+	
+	my $time = time;
 
 	my $st = $db -> prepare ($sql);
 	$st -> execute (@params);
@@ -847,6 +957,8 @@ sub sql_select_loop {
 	
 	$st -> finish ();
 
+	__log_sql_profilinig ({time => $time, sql => $sql, selected => 1});	
+
 }
 
 #################################################################################
@@ -859,7 +971,7 @@ my (@items,@group_by_values_ref,@group_by_fields_ref);
 my ($pattern,$need_group_by);
 my $sc_in_quotes=0;
 
-#warn "~~~ MYSQL TO ORACLE IN: <$sql>\n";
+#warn "ORACLE IN: <$sql>\n";
 
 ############### Заменяем неразрешенные в запросах слова на ключи (обратно восстанавливаем в lc_hashref())
 $sql =~ s/([^\W]\s*\b)user\b(?!\.)/\1RewbfhHHkgkglld/igsm;
@@ -898,14 +1010,31 @@ while ($sql =~m/((\b\w+\s*\((?!.*\().*?)\))/igsm)
 }
 
 $pattern = $sql;
+
+my @order_by;
+
+if ($sql =~ /\s+ORDER\s+BY\s+(.*)/igsm) {
+      
+    @order_by = split ',',$1;
+         
+    foreach my $field (@order_by) {
+	next if ($field =~ m/NULLS\s+(\bFIRST\b|\bLAST\b)/igsm); 
+        $field .= ($field =~ m/\bDESC\b/igsm) ? ' NULLS LAST ' : ' NULLS FIRST ' ; 	
+    }
+			     
+    $new_order_by = join ',',@order_by;
+			      
+    $sql =~ s/(\s+ORDER\s+BY\s+)(.*)/\1$new_order_by/igsm;
+}
+
 $need_group_by=1 if ( $sql =~ m/\s+GROUP\s+BY\s+/igsm);
 
 if ($need_group_by) {
 
-	# Запоминаем значения из GROUP BY до UNION или ORDER BY
+	# Запоминаем значения из GROUP BY до UNION или ORDER BY или HAVING
 	# Также формируем массив хранящий ссылки на массивы значений для каждого SELECT
 	my $sc=0;
-	while ($sql =~ s/\s+GROUP\s+BY\s+(.*?)(\s+UNION\s+|\s+ORDER\s+BY\s+|$)/VJkjn;lohggff\2/ism) {
+	while ($sql =~ s/\s+GROUP\s+BY\s+(.*?)(\s+HAVING\s+|\s+UNION\s+|\s+ORDER\s+BY\s+|$)/VJkjn;lohggff\2/ism) {
 		my @group_by_values = split(',',$1);                                            
 		$group_by_values_ref[$sc++]=\@group_by_values;
 	}
@@ -938,6 +1067,12 @@ for(my $i = $#items; $i >= 1; $i--) {
 	$items[$i] =~ s/\bCONCAT\s*\((.*?)\)/join('||',split(',',$1))/iegsm;
 	$items[$i] =~ s/\bLEFT\s*\((.+?),(.+?)\)/SUBSTR\(\1,1,\2\)/igsm;
 	$items[$i] =~ s/\bRIGHT\s*\((.+?),(.+?)\)/SUBSTR\(\1,LENGTH\(\1\)-\(\2\)+1,LENGTH\(\1\)\)/igsm;
+	if ($model_update -> {characterset} =~ /UTF/i) {
+		$items[$i] =~ s/\bHEX\s*(\(.*?\))/RAWTONHEX\1/igsm;
+	}
+	else {
+		$items[$i] =~ s/\bHEX\s*(\(.*?\))/RAWTOHEX\1/igsm;	
+	}
 	####### DATE_FORMAT
 	if ($items[$i] =~ m/\bDATE_FORMAT\s*\((.+?),(.+?)\)/igsm) {
 		my $expression = $1;
@@ -973,7 +1108,7 @@ for(my $i = $#items; $i >= 1; $i--) {
 		}
 	}
 	######## NOW()
-	$items[$i] =~ s/\bNOW\s*\(.*?\)/TO_CHAR(CURRENT_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')/igsm; 	
+	$items[$i] =~ s/\bNOW\s*\(.*?\)/LOCALTIMESTAMP/igsm; 	
 	######## CURDATE()
 	$items[$i] =~ s/\bCURDATE\s*\(.*?\)/SYSDATE/igsm; 		
 	######## YEAR, MONTH, DAY
@@ -1014,7 +1149,7 @@ if ($need_group_by) {
 		for (my $y = 0; $y <= $#{@{group_by_values_ref[$x]}}; $y++) {
 			my $index = $group_by_values_ref [$x] -> [$y];
 			# Если в GROUP BY стояла цифра - заменяем на значение
-			if ($index =~ m/\d+/igsm) {
+			if ($index =~ m/\b\d+\b/igsm) {
 				push @result,$group_by_fields_ref[$x]->[$index-1];				
 			}
 			# иначе - то что стояло
@@ -1071,7 +1206,9 @@ if ($model_update -> {characterset} =~ /UTF/i) {
 	$sql = $new_sql;
 }
 
-#warn "~~~ MYSQL TO ORACLE OUT: <$sql>\n";
+
+
+#warn "ORACLE OUT: <$sql>\n";
 
 return $sql;	
 

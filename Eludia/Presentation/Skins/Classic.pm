@@ -176,6 +176,9 @@ sub draw_window_title {
 
 	my ($_SKIN, $options) = @_;
 	
+	return ''
+		if $_REQUEST {select};
+		
 	return <<EOH
 		<table cellspacing=0 cellpadding=0 width="100%"><tr><td class='header15'><img src="/i/0.gif" width=1 height=20 align=absmiddle>&nbsp;&nbsp;&nbsp;$$options{label}</table>
 EOH
@@ -398,11 +401,7 @@ sub draw_form {
 	my ($_SKIN, $options) = @_;
 		
 	if ($_REQUEST {__only_field}) {
-		my $html .= '';
-		foreach my $row (@{$options -> {rows}}) {
-			foreach (@$row) { $html .= $_ -> {html} };
-		}
-		return $html;	
+		return '';	
 	}
 			
 	my $html = $options -> {hr};
@@ -415,11 +414,12 @@ sub draw_form {
 
 	$html .=  <<EOH;
 		<table cellspacing=1 width="100%">
+			
 			<form 
 				name="$$options{name}"
 				method="$$options{method}"
 				enctype="$$options{enctype}"
-				action="$_REQUEST{__uri}"
+				action="$_REQUEST{__uri}$_REQUEST{__script_name}"
 				target="$$options{target}"
 			>
 EOH
@@ -504,10 +504,6 @@ sub draw_form_field {
 
 	my ($_SKIN, $field, $data) = @_;
 	
-	if ($_REQUEST {__only_field} && $_REQUEST {__only_field} eq $field -> {name}) {
-		return $field -> {html};
-	}
-							
 	if ($field -> {type} eq 'banner') {
 		my $colspan     = 'colspan=' . ($field -> {colspan} + 1);
 		return qq{<td class='form-$$field{state}-label' $colspan nowrap align=center>$$field{html}</td>};
@@ -545,7 +541,7 @@ sub draw_form_field_button {
 
 sub draw_form_field_string {
 	my ($_SKIN, $options, $data) = @_;
-	$options -> {attributes} -> {class} ||= 'form-active-inputs';
+
 	return '<input type="text"' . dump_attributes ($options -> {attributes}) . ' onKeyPress="if (window.event.keyCode != 27) is_dirty=true" onKeyDown="tabOnEnter()" onFocus="scrollable_table_is_blocked = true; " onBlur="scrollable_table_is_blocked = false; ">';
 }
 
@@ -555,7 +551,6 @@ sub draw_form_field_datetime {
 
 	my ($_SKIN, $options, $data) = @_;
 		
-	$options -> {attributes} -> {class} ||= 'form-active-inputs';	
 	$options -> {name} = '_' . $options -> {name};
 	$options -> {onKeyDown} ="tabOnEnter()";
 
@@ -569,11 +564,14 @@ sub draw_form_field_file {
 
 	my ($_SKIN, $options, $data) = @_;	
 		
+	my $attributes = dump_attributes ($options -> {attributes});
+
 	return <<EOH;
 		<input 
 			type="file"
 			name="_$$options{name}"
 			size=$$options{size}
+			$attributes
 			onFocus="scrollable_table_is_blocked = true; "
 			onBlur="scrollable_table_is_blocked = false; "
 			onChange="is_dirty=true; $$options{onChange}"
@@ -831,6 +829,7 @@ EOH
 		$width = "expression(getElementById('_$$options{name}_select').offsetParent.offsetWidth - 10)";
 	}
 	if (defined $options -> {other}) {
+		$options -> {other} -> {height} ||= 300;
 		$html .= <<EOH;
 			<div id="_$$options{name}_div" style="{position:absolute; display:none; width:$width}">
 				<iframe name="_$$options{name}_iframe" id="_$$options{name}_iframe" width=100% height=${$$options{other}}{height} src="/i/0.html" application="yes">
@@ -958,7 +957,7 @@ EOH
 sub draw_form_field_iframe {
 	
 	my ($_SKIN, $options, $data) = @_;
-
+	$options -> {height} += 0;
 	return <<EOH;
 		<iframe name="$$options{name}" src="$$options{href}" width="$$options{width}" height="$$options{height}" application="yes"></iframe>
 EOH
@@ -1060,7 +1059,11 @@ sub draw_toolbar {
 			icon    => 'cancel',
 			id      => 'cancel',
 			label   => $i18n -> {close},
-			href    => "javaScript:window.parent.restoreSelectVisibility('_$_REQUEST{select}', true);window.parent.focus();",
+			href    => !$_REQUEST {result_kind} 
+						? "javaScript:window.parent.restoreSelectVisibility('_$_REQUEST{select}', true);window.parent.focus();"  						 
+						: $_REQUEST {result_kind} == 2 
+							?  "javaScript:window.parent.restoreStringVocVisibility('_$_REQUEST{select}');window.parent.focus();"
+							: undef,			
 		};
 		
 		$button -> {html} = $_SKIN -> draw_toolbar_button ($button);
@@ -1261,6 +1264,7 @@ EOH
 
 
 	if (defined $options -> {other}) {
+		$options -> {other} -> {height} ||= 300;
 		$html .= <<EOH;
 			<div id="_$$options{name}_div" style="{position:absolute; display:none;width:$options->{other}->{width}px">
 				<iframe name="_$$options{name}_iframe" id="_$$options{name}_iframe" width=100% height=${$$options{other}}{height} src="/i/0.html" application="yes">
@@ -1657,8 +1661,16 @@ sub js_set_select_option {
 	my ($_SKIN, $name, $item, $fallback_href) = @_;	
 	return ($fallback_href || $i) unless $_REQUEST {select};
 	my $question = js_escape ($i18n -> {confirm_close_vocabulary} . ' ' . $item -> {label} . '?');
-	$name ||= '_' . $_REQUEST {select};
-	return 'javaScript:if (window.confirm(' . $question . ')) {parent.setSelectOption(' . js_escape ($name) . ', '	. $item -> {id} . ', ' . js_escape ($item -> {label}) . ');} else {document.body.style.cursor = \'normal\'; nop ();}';
+	
+	if ( !$_REQUEST {result_kind} ) {
+		$name ||= '_' . $_REQUEST {select};
+		return 'javaScript:if (window.confirm(' . $question . ')) {parent.setSelectOption(' . js_escape ($name) . ', '	. $item -> {id} . ', ' . js_escape ($item -> {label}) . ');} else {document.body.style.cursor = \'default\'; nop ();}';		
+	}
+	elsif ( $_REQUEST {result_kind} == 2 ) {
+		$name ||= $_REQUEST {select};
+		return 'javaScript:if (window.confirm(' . $question . ')) {parent.setStringVocValue(' . js_escape ($name) . ', '	. $item -> {id} . ', ' . js_escape ($item -> {label}) . ');} else {document.body.style.cursor = \'default\'; nop ();}';
+	} 
+
 }
 
 ################################################################################
@@ -1684,11 +1696,11 @@ sub draw_text_cell {
 
 		$html .= '&nbsp;' unless (defined $data -> {level});		
 
+		$html .= qq {<a id="$$data{a_id}" class=$$data{a_class} target="$$data{target}" href="$$data{href}" onFocus="blur()">} if $data -> {href};
+
 		$html .= '<b>'      if $data -> {bold}   || $options -> {bold};
 		$html .= '<i>'      if $data -> {italic} || $options -> {italic};
 		$html .= '<strike>' if $data -> {strike} || $options -> {strike};
-
-		$html .= qq {<a id="$$data{a_id}" class=$$data{a_class} target="$$data{target}" href="$$data{href}" onFocus="blur()">} if $data -> {href};
 
 		$html .= $data -> {label};
 		
@@ -1753,6 +1765,64 @@ sub draw_select_cell {
 	
 	return $html;
 
+}
+
+################################################################################
+
+sub draw_string_voc_cell {
+
+	my ($_SKIN, $data, $options) = @_;
+
+	my $attributes = dump_attributes ($data -> {attributes});
+
+	my $html;
+	
+	if (defined $data -> {other}) {		
+		
+		$data -> {other} -> {width}  ||= 600;
+		$data -> {other} -> {height} ||= 400;
+
+		my $d_style_top = "d.style.top = " . (defined $data -> {other} -> {top} ? "${$$data{other}}{top};" : "this.offsetTop + this.offsetParent.offsetTop + this.offsetParent.offsetParent.offsetTop + 50;");
+		my $d_style_left = "d.style.left = " . (defined $data -> {other} -> {left} ? "${$$data{other}}{left};" : "this.offsetLeft + this.offsetParent.offsetLeft + this.offsetParent.offsetParent.offsetLeft;");
+
+		my $onchange = <<EOJS;
+			var fname = '_$$data{name}_iframe';
+			var f = document.getElementById (fname);
+
+			var dname = '_$$data{name}_div';
+			var d = document.getElementById (dname);
+
+			var q = encode1251(document.getElementById('$$data{name}_label').value);
+
+			f.src = '${$$data{other}}{href}&${$$data{other}}{param}=' + q + '&select=$$data{name}&result_kind=2';
+
+			$d_style_top
+			$d_style_left
+
+			document.getElementById ( '_table_div' ).style.overflow = 'visible';
+
+			d.style.display = 'block';			
+			this.style.display = 'none';
+
+			d.focus ();		
+EOJS
+
+		$data -> {onChange} = $onchange . $data -> {onChange}; 
+		
+		$html = <<EOH;
+			<div id="_$$data{name}_div" style="{position:absolute; display:none; z-index:200; width:${$$data{other}}{width}}">
+				<iframe name="_$$data{name}_iframe" id="_$$data{name}_iframe" width=100% height=${$$data{other}}{height} src="/i/0.html" application="yes">
+				</iframe>
+			</div>
+EOH
+	}
+	
+	$html .= qq {<td $attributes><nobr><span style="white-space: nowrap"><input type="text" id="$$data{name}_label" value="$$data{label}" maxlength="$$data{max_len}" size="$$data{size}"> }
+		. ($data -> {other} ? qq [<input type="button" value="$data->{other}->{button}" id="_$$data{name}_button" onclick="$data->{onChange}">] : '')
+		. qq[<input type="hidden" name="_$$data{name}" value="$$data{id}" id="$$data{name}_id"></span>]
+		. qq[</nobr></td>];
+	
+	return $html; 
 }
 
 ################################################################################
@@ -1898,7 +1968,7 @@ sub draw_table {
 		
 		<table cellspacing=0 cellpadding=0 width="100%">		
 			<tr>		
-				<form name=$$options{name} action=$_REQUEST{__uri} method=post enctype=multipart/form-data target=invisible>
+				<form name=$$options{name} action="$_REQUEST{__uri}$_REQUEST{__script_name}" method=post enctype=multipart/form-data target=invisible>
 					<input type=hidden name=type value=$$options{type}>
 					<input type=hidden name=action value=$$options{action}>
 					<input type=hidden name=sid value=$_REQUEST{sid}>
@@ -1912,8 +1982,8 @@ EOH
 	}
 
 	$html .= $options -> {no_scroll} ?
-		qq {<td class=bgr8><div class="table-container-x">} :
-		qq {<td class=bgr8><div class="table-container" style="height: expression(actual_table_height(this,$$options{min_height},$$options{height},'$__last_centered_toolbar_id'));">};
+		qq {<td class=bgr8><div class="table-container-x" id="_table_div">} :
+		qq {<td class=bgr8><div class="table-container" id="_table_div" style="height: expression(actual_table_height(this,$$options{min_height},$$options{height},'$__last_centered_toolbar_id'));">};
 		
 	$html .= qq {<table cellspacing=1 cellpadding=0 width="100%" id="scrollable_table" lpt=$$options{lpt}>\n};
 
@@ -2055,37 +2125,6 @@ sub draw_page {
 
 	my ($_SKIN, $page) = @_;
 
-	if ($_REQUEST {__only_form}) {
-
-		$page -> {body} =~ s{\\}{\\\\}gsm;
-		$page -> {body} =~ s{\"}{\\\"}gsm; #"
-		$page -> {body} =~ s{[\n\r\s]+}{ }gsm;
-
-		return <<EOH;
-		<body onLoad="main()">
-			<script>
-				function main () {
-					
-					var element = window.parent.document.getElementById ('input_$_REQUEST{__only_field}');
-				
-					var html = "$page->{body}";
-
-					if (element) {
-						element.outerHTML = html;
-						element.tabIndex = "$_REQUEST{__only_tabindex}";
-					}
-					else {
-						element = window.parent.document.forms ['$_REQUEST{__only_form}'].elements ['_$_REQUEST{__only_field}'];
-						element.outerHTML = html;
-						element.tabIndex = "$_REQUEST{__only_tabindex}";
-					}
-					
-				}
-			</script>
-		</body>
-EOH
-	}
-		
 	$_REQUEST {__scrollable_table_row} ||= 0;
 	
 	my $meta_refresh = $_REQUEST {__meta_refresh} ? qq{<META HTTP-EQUIV=Refresh CONTENT="$_REQUEST{__meta_refresh}; URL=@{[create_url()]}&__no_focus=1">} : '';	
@@ -2185,7 +2224,7 @@ EOCSS
 					function check_edit_mode () {
 						if (edit_mode) {
 							alert('$$i18n{save_or_cancel}'); 
-							document.body.style.cursor = 'normal'; 
+							document.body.style.cursor = 'default'; 
 							return true;
 						}
 						return false;
@@ -2412,7 +2451,7 @@ sub draw_logon_form {
 			<tr>
 				<td align=middle>   
 					<table cellspacing=0 cellpadding=0 border=0>      
-						<form action=$_REQUEST{__uri} method=post autocomplete="off">
+						<form action="$_REQUEST{__uri}$_REQUEST{__script_name}" method=post autocomplete="off">
 							<input type=hidden name=type value=logon>
 							<input type=hidden name=_url value="$_REQUEST{_url}">
 							<input type=hidden name=action value=execute>

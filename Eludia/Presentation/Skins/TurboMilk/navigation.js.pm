@@ -25,6 +25,35 @@ var kb_hooks = [{}, {}, {}, {}];
 
 var max_len = 50;
 
+
+function dialog_open (href, arg, options) {
+						
+	var result = window.showModalDialog (href, arg, options);
+
+	document.body.style.cursor = 'default';
+	
+	return result;
+
+}
+
+function encode1251 (str) {
+
+	var r = /[à-ÿÀ-ß]/g;
+	var result = str.replace (r, function (chr) {
+		result = chr.charCodeAt(0) - 848;
+		return '%' + result.toString(16);
+	});
+	r = /¸/g;
+	result = result.replace (r, '%b8');
+	r = /¨/g;
+	result = result.replace (r, '%à8');
+	r = / /g;
+	result = result.replace (r, '%20');
+	
+	return result;
+
+}
+
 function handle_hotkey_focus    (r) {document.form.elements [r.data].focus ()}
 function handle_hotkey_focus_id (r) {document.getElementById (r.data).focus ()}
 function handle_hotkey_href     (r) {
@@ -139,8 +168,7 @@ function idx_tables (__scrollable_table_row) {
 	scrollable_table_row_cell = 0;
 
 	if (scrollable_rows.length > 0) {
-		var cell = cell_on ();
-		if (scrollable_table_row > 0) scrollCellToVisibleTop (cell);
+		if (scrollable_table_row > 0) scrollCellToVisibleTop (cell_on ());
 	}
 	else {
 		scrollable_table = null;
@@ -157,9 +185,14 @@ function code_alt_ctrl (code, alt, ctrl) {
 	return 1;
 }
 
+function endsWith (str, s){
+	var reg = new RegExp (s + "$");
+	return reg.test (str);
+}
+
 function check_top_window () {
 	try {
-		if (window.name != '_body_iframe' && window.name != '_content_iframe') window.location.href = window.location.href + '&__top=1'
+		if (!endsWith (window.name, '_iframe')) window.location.href = window.location.href + '&__top=1'
 	} catch (e) {}
 }
 
@@ -235,7 +268,8 @@ function td_on_click () {
 	var new_scrollable_table_row = td2sr [uid];
 	var new_scrollable_table_row_cell = td2sc [uid];
 	if (new_scrollable_table_row == null || new_scrollable_table_row_cell == null) return;
-	scrollable_rows [scrollable_table_row].cells [scrollable_table_row_cell].className = scrollable_table_row_cell_old_style;
+	if (scrollable_table_row_cell_old_style)
+		scrollable_rows [scrollable_table_row].cells [scrollable_table_row_cell].className = scrollable_table_row_cell_old_style;
 	scrollable_table_row = new_scrollable_table_row;
 	scrollable_table_row_cell = new_scrollable_table_row_cell;
 	scrollable_table_row_cell_old_style = scrollable_rows [scrollable_table_row].cells [scrollable_table_row_cell].className;
@@ -458,7 +492,7 @@ function menuItemOver (td, child, div, level) {
 
 
 		last_vert_menu [level].td = td;
-		td.style.backgroundImage='url(menu_bg_s.gif)';
+		td.style.backgroundImage='url(/i/_skins/TurboMilk/menu_bg_s.gif)';
 
 		if (child) {
 			var submenu = document.getElementById ('vert_menu_' + child);
@@ -548,6 +582,15 @@ function restoreSelectVisibility (name, rewind) {
 	}
 };
 
+function setCursor (w, c) {
+
+	if (!w) w = window;
+	if (!c) c = 'default';
+
+	return void (w.document.body.style.cursor = c);
+	
+}
+
 function invoke_setSelectOption (a) {
 
 	if (window.confirm (a.question)) {	
@@ -555,7 +598,7 @@ function invoke_setSelectOption (a) {
 		if (ws) ws.window._setSelectOption (a.id, a.label);
 	} 
 	else {
-		document.body.style.cursor = 'normal'; 
+		document.body.style.cursor = 'default'; 
 		nop ();
 	};
 
@@ -631,7 +674,7 @@ function absTop (element) {
 
 function scrollCellToVisibleTop (td) {
 	
-	var table = td.parentElement.parentElement.parentElement;
+	var table = td.parentElement.parentElement.parentElement.parentElement;
 	var thead = table.tHead;
 	var div   = table.parentElement;
 
@@ -811,7 +854,9 @@ function cell_on () {
 
 function cell_off () {
 	var cell = get_cell ();
-	cell.className = scrollable_table_row_cell_old_style;
+	if (scrollable_table_row_cell_old_style) 
+		cell.className = scrollable_table_row_cell_old_style;
+		
 	return cell;	
 }
 
@@ -852,9 +897,7 @@ function actual_table_height (table, min_height, height, id_toolbar) {
 
 	var real_height       = table.firstChild.offsetHeight;
 	
-//	if (table.offsetWidth > table.parentElement.offsetWidth) {
-		real_height += 14;
-//	}
+	real_height += 18;
 
 	var max_screen_height = document.body.offsetHeight - absTop (table) - 23;
 	
@@ -2210,6 +2253,9 @@ Calendar.prototype.hide = function () {
  */
 Calendar.prototype.showAt = function (x, y) {
 	var s = this.element.style;
+	var calendarWidth = 228;
+	var gap = x + calendarWidth - window.parent.document.body.offsetWidth;
+	if (gap > 0) x -= gap;
 	s.left = x + "px";
 	s.top = y + "px";
 	this.show();
@@ -2727,7 +2773,7 @@ Calendar.setup = function (params) {
 
 // Node object
 
-function Node (id, pid, name, url, title, target, icon, iconOpen, open, context_menu) {
+function Node (id, pid, name, url, title, target, icon, iconOpen, open, context_menu, is_checkbox) {
 
 	this.id = id;
 	this.pid = pid;
@@ -2739,6 +2785,7 @@ function Node (id, pid, name, url, title, target, icon, iconOpen, open, context_
 	this.iconOpen = iconOpen;
 	this._io = open || false;
 	this.context_menu = context_menu;
+	this.is_checkbox = is_checkbox;
 	this._is = false;
 	this._ls = false;
 	this._hc = false;
@@ -2792,22 +2839,23 @@ function dTree (objName) {
 	this.selectedNode = null;
 	this.selectedFound = false;
 	this.completed = false;
-
+	
+	this.checkedNodes = [];
 };
 
 
 
 // Adds a new node to the node array
 
-dTree.prototype.add = function(id, pid, name, url, title, target, icon, iconOpen, open, context_menu) {
+dTree.prototype.add = function(id, pid, name, url, title, target, icon, iconOpen, open, context_menu, is_checkbox) {
 
-	this.aNodes[this.aNodes.length] = new Node(id, pid, name, url, title, target, icon, iconOpen, open, context_menu);
+	this.aNodes[this.aNodes.length] = new Node(id, pid, name, url, title, target, icon, iconOpen, open, context_menu, is_checkbox);
 
 };
 
 dTree.prototype.addAll = function (a) {
 
-	for (i in a) this.aNodes[this.aNodes.length] = new Node (i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9]);
+	for (i in a) this.aNodes[this.aNodes.length] = new Node (i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10]);
 
 };
 
@@ -2945,7 +2993,13 @@ dTree.prototype.node = function(node, nodeId) {
 		str += '<img id="i' + this.obj + nodeId + '" src="' + this.config.iconPath + ((node._io) ? node.iconOpen : node.icon) + '" alt="" />';
 
 	}
-
+	
+	if (node.is_checkbox) {
+		str += '<input class=cbx type=checkbox name="_' + this.obj + '_' + node.id + '"' + (node.is_checkbox > 1 ? 'checked' : '') + ' value=1 tabindex=-1 onChange="is_dirty=true" />';
+		if (node.is_checkbox > 1)
+			this.checkedNodes[this.checkedNodes.length] = nodeId;
+	}
+  
 	if (node.url) {
 
 		str += '<a id="s' + this.obj + nodeId + '" class="' + ((this.config.useSelection) ? ((node._is ? 'nodeSel' : 'node')) : 'node') + '" href="' + node.url + '"';
@@ -2981,7 +3035,7 @@ dTree.prototype.node = function(node, nodeId) {
 		str += '</div>';
 
 	}
-
+	
 	this.aIndent.pop();
 
 	return str;
@@ -3074,7 +3128,7 @@ dTree.prototype.s = function(id) {
 
 			eOld = document.getElementById("s" + this.obj + this.selectedNode);
 
-			eOld.className = "node";
+			if (eOld) eOld.className = "node";
 
 		}
 

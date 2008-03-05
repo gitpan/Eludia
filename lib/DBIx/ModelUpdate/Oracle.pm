@@ -32,8 +32,6 @@ sub prepare {
 
 	my ($self, $sql) = @_;
 	
-#print STDERR "prepare (pid=$$): $sql\n";
-
 	return $self -> {db} -> prepare ($sql);
 
 }
@@ -101,9 +99,7 @@ EOS
 		}
 	
 	}
-	
-#print STDERR Dumper ($keys);
-		
+			
 	return $keys;
 
 }
@@ -181,42 +177,62 @@ EOS
 
 sub get_canonic_type {
 
-	my ($self, $definition, $should_change, $core_voc_replacement_use) = @_;
-	
-	$type_name = lc $definition -> {TYPE_NAME};
+	my ($self, $definition, $should_change) = @_;
 
-	if ($core_voc_replacement_use) {		
-	        return 'VARCHAR2' 		if ($type_name =~ /char$/ && !($self -> {characterset} =~ /UTF/i));
-		return 'NVARCHAR2' 		if ($type_name =~ /char$/ && ($self -> {characterset} =~ /UTF/i));
-	        return 'VARCHAR2(4000)'		if ($type_name eq 'text' && !($self -> {characterset} =~ /UTF/i));
-		return 'NVARCHAR2(2000)' 	if ($type_name eq 'text' && ($self -> {characterset} =~ /UTF/i));
-		return 'NUMBER'   		if $type_name  eq 'decimal';
-		return 'NUMBER'   		if $type_name  =~ /int$/    && $definition -> {COLUMN_SIZE};
-		return 'NUMBER(25,0)'   	if $type_name  eq 'bigint';
-		return 'NUMBER(10,0)'  		if $type_name  eq 'int';
-		return 'NUMBER(8,0)'    	if $type_name  eq 'mediumint';
-		return 'NUMBER(5,0)'    	if $type_name  eq 'smallint';
-		return 'NUMBER(3,0)'    	if $type_name  eq 'tinyint';	
-		return 'CLOB'     		if ($type_name eq 'longtext' && !($self -> {characterset} =~ /UTF/i));;
-		return 'NCLOB'    		if ($type_name eq 'longtext' && ($self -> {characterset} =~ /UTF/i));;
-		return 'RAW'      		if $type_name  eq 'varbinary';
-		return 'BLOB'      		if $type_name  eq 'longblob';		
+	my $type_name = lc $definition -> {TYPE_NAME};
+	
+	if ($type_name =~ /int$/) {
+	
+		$definition -> {COLUMN_SIZE} ||= 
+		
+			$type_name eq 'int'       ? 10 : 
+			$type_name eq 'tinyint'   ? 3  : 
+			$type_name eq 'bigint'    ? 22 : 
+			$type_name eq 'smallint'  ? 5  : 
+			$type_name eq 'mediumint' ? 8  :
+			undef;
+		
+		return 'NUMBER';
+	
 	}
-	else {
-		return 'VARCHAR2' if $type_name eq 'varchar';
-		return 'NUMBER'   if $type_name =~ /int$/;
-		return 'NUMBER'   if $type_name eq 'decimal';
-		return 'CLOB'     if $type_name =~ /text$/;
-		return 'BLOB'     if $type_name eq 'longblob';		
-        }
 	
-	if ($type_name =~ /date|time/) {
-		if ($should_change && $type_name =~ /timestamp/) {
-			$definition -> {COLUMN_DEF} = 'SYSDATE';
-		}
-		return 'DATE';
-	};
+	return 'NUMBER' if $type_name eq 'decimal';
+
+	my $utf = $self -> {characterset} =~ /UTF/i;
+
+	my $N = $utf ? 'N' : '';
 	
+	if ($type_name eq 'text') {
+	
+		$definition -> {COLUMN_SIZE} ||= $utf ? 2000 : 4000;
+	
+	}
+
+	return $N . 'VARCHAR2' if $type_name =~ /char$/;
+	return $N . 'VARCHAR2' if $type_name eq 'text';
+	return $N . 'CLOB'     if $type_name eq 'longtext';
+	return 'RAW'           if $type_name eq 'varbinary';
+	return 'BLOB'          if $type_name eq 'longblob';
+	return 'DATE'          if $type_name eq 'date';
+
+	if ($self -> {db} -> {Driver} -> {Name} eq 'ODBC') {
+		if ($type_name =~ /date|time/) {
+		
+			$definition -> {COLUMN_DEF} = 'SYSDATE' if $should_change && ($type_name eq 'timestamp');
+	
+			
+			return 'DATE';
+			
+		};
+	} else {			
+		if ($type_name =~ /time/) {
+				
+			$definition -> {COLUMN_DEF} = 'LOCALTIMESTAMP' if $should_change && ($type_name eq 'timestamp');		
+			return 'TIMESTAMP';
+			
+		};
+	}
+		
 	return uc $type_name;
 
 }    
@@ -229,7 +245,7 @@ sub gen_column_definition {
 	
 	$definition -> {NULLABLE} = 1 unless defined $definition -> {NULLABLE};
 	
-	my $type = $self -> get_canonic_type ($definition, 1,, $core_voc_replacement_use);
+	my $type = $self -> get_canonic_type ($definition, 1);
 
 	if (lc $name eq 'date') {
 		$name = '"'.$name.'"';
@@ -243,12 +259,19 @@ sub gen_column_definition {
 		$sql .= ')';	
 	}
 	
-#	$sql .= ' ' . $definition -> {_EXTRA} if $definition -> {_EXTRA};
-
 	if ($type eq 'CLOB' || $type eq 'NCLOB') {
 		$sql .= ' DEFAULT empty_clob()';
-	} elsif (exists $definition -> {COLUMN_DEF}) {
-		$sql .= ' DEFAULT ' . ($definition -> {COLUMN_DEF} eq 'SYSDATE' ? 'SYSDATE' : $self -> {db} -> quote ($definition -> {COLUMN_DEF}));
+	} 
+	elsif ($type eq 'BLOB') {
+		$sql .= ' DEFAULT empty_blob()';
+	} 
+	elsif (exists $definition -> {COLUMN_DEF}) {
+	
+		if ($definition -> {COLUMN_DEF} !~ /^[A-Z]+$/) {
+			$definition -> {COLUMN_DEF} = $self -> {db} -> quote ($definition -> {COLUMN_DEF});
+		}
+	
+		$sql .= ' DEFAULT ' . $definition -> {COLUMN_DEF};
 	}
 
 	my ($nn_constraint_name, $pk_constraint_name) = ('nn_' . $table_name . '_' . $name, 'pk_' . $table_name . '_' . $name);
@@ -333,8 +356,13 @@ sub create_table {
 			else {
 				$sequence_name = "SEQ_"."$name";			
 			}
+	
+			unless ($self -> sql_select_scalar("SELECT COUNT(*) FROM USER_SEQUENCES WHERE SEQUENCE_NAME = '${sequence_name}' ")) {		
 
-			$self -> do ("CREATE SEQUENCE $q${sequence_name}$q START WITH 1 INCREMENT BY 1 MINVALUE 1");
+				$self -> do ("CREATE SEQUENCE $q${sequence_name}$q START WITH 1 INCREMENT BY 1 MINVALUE 1");
+
+			}
+
 			if (uc $name ne uc $self -> {__voc_replacements}) { 			
 				$trigger_name = voc_replacements($self, $name, $name, 3, 'CREATE');		
 			}
@@ -342,15 +370,17 @@ sub create_table {
 				$trigger_name = "TRG_"."$name";			
 			}
 
-			$self -> do (<<EOS);
-				CREATE TRIGGER $q${trigger_name}$q BEFORE INSERT ON $q${name}$q
-				FOR EACH ROW
-				WHEN (new.$pk_column is null)
-				BEGIN
-					SELECT $q${sequence_name}$q.nextval INTO :new.$pk_column FROM DUAL;
-				END;		
+			unless ($self -> sql_select_scalar("SELECT COUNT(*) FROM USER_TRIGGERS WHERE TRIGGER_NAME = '${trigger_name}'")) {		
+				$self -> do (<<EOS);
+					CREATE TRIGGER $q${trigger_name}$q BEFORE INSERT ON $q${name}$q
+					FOR EACH ROW
+					WHEN (new.$pk_column is null)
+					BEGIN
+						SELECT $q${sequence_name}$q.nextval INTO :new.$pk_column FROM DUAL;
+					END;		
 EOS
-			$self -> do ("ALTER TRIGGER $q${trigger_name}$q COMPILE");
+				$self -> do ("ALTER TRIGGER $q${trigger_name}$q COMPILE");
+			}
 		}
 		else {
 
@@ -431,25 +461,30 @@ sub update_column {
 
 	my ($self, $name, $c_name, $existing_column, $c_definition,$core_voc_replacement_use) = @_;
 	
-	my $eq_types = ($self -> get_canonic_type ($existing_column,,,$core_voc_replacement_use) eq $self -> get_canonic_type ($c_definition, 1,,$core_voc_replacement_use));
+	my $existing_type = $self -> get_canonic_type ($existing_column);
+
+#warn Dumper ($existing_column);
+
+	my $c_type = $self -> get_canonic_type ($c_definition, 1);
+	
+#warn Dumper ($c_definition);
+
+	if ($c_type =~ /(\w+)\s*\(\s*(\d+)\s*\,\s*(\d+)/) {
+		$c_type = $1;
+		$c_definition -> {COLUMN_SIZE} = $2;
+	}
+
+	my $eq_types = $existing_type eq $c_type;
+
 	my $eq_sizes = ($existing_column -> {COLUMN_SIZE} >= $c_definition -> {COLUMN_SIZE});
 
 	my $existing_def = $self -> get_column_def ($existing_column);
-	my $column_def = $self -> get_column_def ($c_definition);
-	my $eq_defaults = ($existing_def eq $column_def);
-
-#print STDERR "+++ $c_name +++\n";
-#print STDERR "+++ Existing column type_name: $existing_column->{TYPE_NAME} +++\n";
-#print STDERR "+++ Column definition type_name: $c_definition->{TYPE_NAME} +++\n";
-#print STDERR '$existing_type  = ', $self -> get_canonic_type ($existing_column -> {TYPE_NAME}), "\n";
-#print STDERR '$c_type = ', $self -> get_canonic_type ($c_definition -> {TYPE_NAME}), "\n";
-#print STDERR "\$eq_types = $eq_types\n";
-#print STDERR "\$eq_sizes = $eq_sizes\n";
-#print STDERR "\$eq_defaults = $eq_defaults\n";
+	my $column_def   = $self -> get_column_def ($c_definition);
+	my $eq_defaults  = ($existing_def eq $column_def);
 
 	return if $eq_types && $eq_sizes && $eq_defaults;
 	
-	return if $self -> get_canonic_type ($existing_column,,,$core_voc_replacement_use) =~ /LOB/;
+	return if $self -> get_canonic_type ($existing_column) =~ /LOB/;
 	
 	$c_definition -> {_PK} = 0 if ($existing_column -> {_PK} == 1);
 	delete $c_definition -> {NULLABLE} if (exists $existing_column -> {NULLABLE} && $existing_column -> {NULLABLE} == 0);
@@ -511,15 +546,20 @@ sub drop_index {
 	my $q = $table_name =~ /^_/ ? $self -> {quote} : '';
 
 	if ($core_voc_replacement_use) {
+		
 		my $replaced_name;
 
-		if ($replaced_name = voc_replacements ($self ,$table_name, $index_name, 1,'DELETE')) {
+		if ($replaced_name = voc_replacements ($self ,$table_name, $index_name, 1, 'DELETE')) {
 			$index_name = $replaced_name;
+		}
+		else {
+			return;
 		}
 
 		warn "DROP INDEX $q$index_name$q\n";
 
 		$self -> {db} -> do ("DROP INDEX $q$index_name$q");
+		
 	}
 	else {
 
@@ -555,17 +595,22 @@ sub create_index {
 
 	if ($core_voc_replacement_use) {
 	
-		my $replaced_name = voc_replacements ($self ,$table_name, $index_name, 1,'CREATE');
+		my $replaced_name = voc_replacements ($self, $table_name, $index_name, 1,'CREATE');
 
 		warn "CREATE INDEX $q${replaced_name}$q ON $q${table_name}$q ($index_def)\n";
 
-		$self -> {db} -> do ("CREATE INDEX $q${replaced_name}$q ON $q${table_name}$q ($index_def)");
+		eval {
+			$self -> {db} -> do ("CREATE INDEX $q${replaced_name}$q ON $q${table_name}$q ($index_def)");
+		};
+		
+		warn "$@" if $@;
+		
 	}
 	else {
 	
 		warn "CREATE INDEX $q${table_name}_${index_name}$q ON $q$table_name$q ($index_def)\n";
 
-		$self -> {db} -> do ("CREATE INDEX $q${table_name}_${index_name}$q ON $q$table_name$q ($index_def)");	
+		$self -> {db} -> do ("CREATE INDEX $q${table_name}_${index_name}$q ON $q$table_name$q ($index_def)");
 	
 	}
 	
@@ -589,42 +634,45 @@ sub sql_select_scalar {
 }
 
 ################################################################################
+
 sub voc_replacements {
 	
-	my ($self,$table_name,$object_name,$object_type,$action) = @_;
+	my ($self, $table_name, $object_name, $object_type, $action) = @_;
 
 	my $core_name = $self -> {__voc_replacements};
-
-	my $replaced_name;
-
-	$replaced_name = 'IDX_' if ($object_type==1);
-	$replaced_name = 'SEQ_' if ($object_type==2);
-	$replaced_name = 'TRG_' if ($object_type==3);
 	
-#	warn "<<< VOC_REPLCAMENTS: $table_name,$object_name,$object_type,$action >>>";
+	my $replaced_name = 
+		$object_type == 1 ? 'IDX_' :
+		$object_type == 2 ? 'SEQ_' :
+		$object_type == 3 ? 'TRG_' :
+		'';
 
 	if ($action eq 'DELETE') {
 
-		my $id = $self -> sql_select_scalar ("SELECT id FROM $core_name WHERE table_name= '${table_name}' AND object_name='${object_name}' AND object_type=$object_type");		
+		my $id = $self -> sql_select_scalar ("SELECT id FROM $core_name WHERE table_name= '${table_name}' AND object_name='${object_name}' AND object_type=$object_type");
+		
+		$id or return;
 	
 		$replaced_name .= $id; 
 	
-		$self -> {db} -> do ("DELETE FROM $core_name WHERE id = $id");		
+		$self -> {db} -> do ("DELETE FROM $core_name WHERE id = $id");
 	
 	}
 	
 	if ($action eq 'CREATE') {	
 
-		unless ($self -> sql_select_scalar("SELECT COUNT(*) FROM $core_name WHERE table_name= '${table_name}' AND object_name='${object_name}' AND object_type=$object_type")) {		
+		unless ($self -> sql_select_scalar("SELECT COUNT(*) FROM $core_name WHERE table_name= '${table_name}' AND object_name='${object_name}' AND object_type=$object_type")) {
 
 			$self -> {db} -> do ("INSERT INTO $core_name (table_name,object_name,object_type) VALUES ('${table_name}','${object_name}',$object_type)");
+
 		}
  
 		$replaced_name .= $self -> sql_select_scalar ("SELECT id FROM $core_name WHERE table_name= '${table_name}' AND object_name='${object_name}' AND object_type=$object_type");
+	
 	}
 
 	return $replaced_name;
-	
+
 }
 
 1;

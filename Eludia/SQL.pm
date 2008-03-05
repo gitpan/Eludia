@@ -80,17 +80,13 @@ sub sql_weave_model {
 
 ################################################################################
 
-sub sql_assert_core_tables {
+sub check_systables {
 
-	$db or return;
-
-	$model_update or die "\$db && !\$model_update ?!! Can't believe it.\n";
-
-	foreach (qw(
-		_db_model_checksums	
+	foreach (qw(	
 		__voc_replacements	
 		__access_log		
 		__benchmarks		
+		__request_benchmarks
 		__last_update		
 		__moved_links		
 		__required_files	
@@ -104,19 +100,27 @@ sub sql_assert_core_tables {
 		$conf -> {systables} -> {$_} ||= $_;
 	}
 
+}
+
+################################################################################
+
+sub sql_assert_core_tables {
+ 
+	$db or return;
+
+	$model_update or die "\$db && !\$model_update ?!! Can't believe it.\n";
+
 	return if $model_update -> {core_ok};
 
 my $time = time;
+	
+	if ($conf -> {core_voc_replacement_use}) {
+	
+		$model_update -> assert (tables => {$conf -> {systables} -> {__voc_replacements} => {
 
-print STDERR "sql_assert_core_tables [$$] started...\n";
-
-	my %defs = (
-
-		$conf -> {systables} -> {__voc_replacements} => {
-		
 			columns => {
-				id         => {TYPE_NAME => 'bigint', _EXTRA => 'auto_increment', _PK => 1},
-				table_name => {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
+				id          => {TYPE_NAME => 'bigint', _EXTRA => 'auto_increment', _PK => 1},
+				table_name  => {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
 				object_name => {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
 				object_type => {TYPE_NAME => 'int', COLUMN_SIZE => 1},
 			},
@@ -126,10 +130,11 @@ print STDERR "sql_assert_core_tables [$$] started...\n";
 				ix2 => 'object_name',
 			},
 
-		},
-	);
+		}});
+	
+	}
 
-	$model_update -> assert (tables => \%defs,core_voc_replacement_use => $conf -> {core_voc_replacement_use});
+$time = __log_profilinig ($time, ' <sql_assert_core_tables>: 136');
 
 	my %defs = (
 	
@@ -261,13 +266,15 @@ print STDERR "sql_assert_core_tables [$$] started...\n";
 	);
 	
 	$conf -> {core_cache_html} and $defs {$conf -> {systables} -> {cache_html}} = {
+
 		columns => {
 			uri     => {TYPE_NAME  => 'varchar', COLUMN_SIZE  => 255, _PK    => 1},
 			ts      => {TYPE_NAME  => 'timestamp'},
 		}
+
 	};
 	
-	$preconf -> {core_debug_profiling} == 2 and $defs {$conf->{systables}->{__benchmarks}} = {
+	$preconf -> {core_debug_profiling} > 1 and $defs {$conf->{systables}->{__benchmarks}} = {
 
 		columns => {
 			id       => {TYPE_NAME  => 'int'    , _EXTRA => 'auto_increment', _PK => 1},
@@ -277,7 +284,6 @@ print STDERR "sql_assert_core_tables [$$] started...\n";
 			ms       => {TYPE_NAME  => 'bigint' , COLUMN_DEF => 0, NULLABLE => 0},
 			mean     => {TYPE_NAME  => 'bigint' , COLUMN_DEF => 0, NULLABLE => 0},
 			selected => {TYPE_NAME  => 'bigint' , COLUMN_DEF => 0, NULLABLE => 0},
-			mean     => {TYPE_NAME  => 'bigint' , COLUMN_DEF => 0, NULLABLE => 0},
 			mean_selected => {TYPE_NAME  => 'bigint' , COLUMN_DEF => 0, NULLABLE => 0},
 		},
 		
@@ -287,7 +293,35 @@ print STDERR "sql_assert_core_tables [$$] started...\n";
 		
 	};
 
+	$preconf -> {core_debug_profiling} > 2 and $defs {$conf->{systables}->{__request_benchmarks}} = {
+
+		columns => {
+			id	=> {TYPE_NAME  => 'int'    , _EXTRA => 'auto_increment', _PK => 1},
+			fake	=> {TYPE_NAME  => 'bigint' , COLUMN_DEF => 0, NULLABLE => 0},
+			id_user	=> {TYPE_NAME => 'int'},
+			dt	=> {TYPE_NAME => 'timestamp'},
+			params	=> {TYPE_NAME => 'longtext'},
+			ip =>     {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
+			ip_fw =>  {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
+			type =>   {TYPE_NAME => 'varchar', COLUMN_SIZE => 255},
+			mac    => {TYPE_NAME  => 'varchar', COLUMN_SIZE => 17},
+
+			connection_id		=> {TYPE_NAME => 'int'},
+			connection_no		=> {TYPE_NAME => 'int'},
+
+			request_time		=> {TYPE_NAME => 'int'},
+			application_time	=> {TYPE_NAME => 'int'},
+			sql_time		=> {TYPE_NAME => 'int'},
+			response_time		=> {TYPE_NAME => 'int'},
+			
+			bytes_sent		=> {TYPE_NAME => 'int'},
+			is_gzipped		=> {TYPE_NAME => 'tinyint'}, 
+		},
+
+	};
+
 	$conf -> {core_screenshot} and $defs {$conf -> {systables} -> {__screenshots}} = {
+
 		columns => {
 			id        => {TYPE_NAME  => 'int', _EXTRA => 'auto_increment', _PK => 1},
 			subset    => {TYPE_NAME => 'varchar', COLUMN_SIZE  => 255},
@@ -300,14 +334,14 @@ print STDERR "sql_assert_core_tables [$$] started...\n";
 			gziped    => {TYPE_NAME => 'tinyint', COLUMN_DEF => 0},
 			params    => {TYPE_NAME => 'text'},
 		},
+
 	};
 
-	$model_update -> assert (tables => \%defs,core_voc_replacement_use => $conf -> {core_voc_replacement_use});
+	$model_update -> assert (tables => \%defs, core_voc_replacement_use => $conf -> {core_voc_replacement_use});
 
 	$model_update -> {core_ok} = 1;
-	
-	
-print STDERR "sql_assert_core_tables [$$] finished:" . (time - $time) . " ms\n";	
+		
+__log_profilinig ($time, ' <sql_assert_core_tables>');
 	
 }
 
@@ -397,9 +431,9 @@ sub sql_reconnect {
 		return if $ping;
 	}
 	
-	$conf = {%$conf, %$preconf};
+	check_systables ();
 
-	our $db = DBI -> connect ($conf -> {'db_dsn'}, $conf -> {'db_user'}, $conf -> {'db_password'}, {
+	our $db = DBI -> connect ($preconf -> {'db_dsn'}, $preconf -> {'db_user'}, $preconf -> {'db_password'}, {
 		RaiseError  => 1, 
 		AutoCommit  => 1,
 		LongReadLen => 1000000,
@@ -408,10 +442,12 @@ sub sql_reconnect {
 	});
 
 	my $driver_name = $db -> get_info ($GetInfoType {SQL_DBMS_NAME});
+	
+	$driver_name =~ s{\W}{}gsm;
 
 	eval "require Eludia::SQL::$driver_name";
 
-	print STDERR $@ if $@;
+	die $@ if $@;
 	
 	our $SQL_VERSION = sql_version ();
 	$SQL_VERSION -> {driver} = $driver_name;
@@ -430,11 +466,9 @@ sub sql_reconnect {
 			core_voc_replacement_use=> $conf -> {core_voc_replacement_use},
 		);
 
-		$preconf -> {no_model_update} = 1;
+#		$preconf -> {no_model_update} = 1;
 		
 	}
-
-	our %sts = ();
 
 }   	
 
@@ -443,7 +477,6 @@ sub sql_reconnect {
 sub sql_disconnect {
 	if ($db) { $db -> disconnect; }
 	undef $db;
-	undef %sts;	
 }
 
 ################################################################################
@@ -495,8 +528,24 @@ sub sql_select_vocabulary {
 		$options -> {label} =~ s/ AS.*//i;
 		$options -> {label} .= ' AS label';
 	}
+	
+	$options -> {label} .= ', parent' if $options -> {tree};
 		
-	return sql_select_all ("SELECT id, $$options{label} FROM $table_name WHERE $filter ORDER BY $$options{order} $limit");
+	my $list = sql_select_all ("SELECT id, $$options{label} FROM $table_name WHERE $filter ORDER BY $$options{order} $limit");
+	
+	if ($options -> {tree}) {
+	
+		$list = tree_sort ($list);
+		
+		if (!$_REQUEST {__read_only} || $_REQUEST {__only_form}) {
+
+			foreach (@$list) { $_ -> {label} = ('&nbsp;&nbsp;' x $_ -> {level}) . $_ -> {label} }
+	
+		}
+		
+	}
+
+	return $list;
 	
 }
 
@@ -688,6 +737,9 @@ sub sql_undo_relink {
 	ref $old_ids eq ARRAY or $old_ids = [$old_ids];
 			
 	foreach my $old_id (@$old_ids) {
+		
+		$old_id > 0 or next;
+
 warn "undo relink $table_name: $old_id";
 
 		my $record = sql_select_hash ($table_name, $old_id);
@@ -727,7 +779,7 @@ warn "undo relink $$column_def{table_name} ($$column_def{name}): $old_id";
 
 sub assert_fake_key {
 
-	$DB_MODEL or return;
+	$DB_MODEL -> {tables} -> {$table_name} or return;
 	
 	my ($table_name) = @_;
 
@@ -772,5 +824,60 @@ EOS
 
 ################################################################################
 	
+sub __log_sql_profilinig {
+	
+	my ($options) = @_;
 
+	$_REQUEST {__sql_time} += 1000 * (time - $options -> {time});
+	 
+}
+
+################################################################################
+	
+sub __log_request_profilinig {
+
+	my ($request_time) = @_;
+
+	return 
+		unless ($preconf -> {core_debug_profiling} > 2 && $model_update -> {core_ok});
+		
+	my $c = $r -> connection; 
+
+	$_REQUEST {_id_request_log} = sql_do_insert ($conf -> {systables} -> {__request_benchmarks}, {
+		id_user	=> $_USER -> {id}, 
+		ip	=> $ENV {REMOTE_ADDR}, 
+		ip_fw	=> $ENV {HTTP_X_FORWARDED_FOR},
+		fake	=> 0,
+		type	=> $_REQUEST {type},
+		mac	=> (!$preconf -> {core_no_log_mac}) ? get_mac () : '',
+		request_time	=> int ($request_time),
+		connection_id	=> $c -> id (),
+		connection_no	=> $c -> keepalives (),
+	});
+	
+	sql_do ("UPDATE $conf->{systables}->{__request_benchmarks} SET params = ? WHERE id = ?",
+		Data::Dumper -> Dump ([\%_REQUEST], ['_REQUEST']), $_REQUEST {_id_request_log}); 
+
+}
+
+################################################################################
+	
+sub __log_request_finish_profilinig {
+
+	my ($options) = @_;
+
+	return 
+		unless ($preconf -> {core_debug_profiling} > 2 && $model_update -> {core_ok}); 
+
+	my $time = time;
+
+	sql_do ("UPDATE $conf->{systables}->{__request_benchmarks} SET application_time = ?, sql_time = ?, response_time = ?, bytes_sent = ?, is_gzipped = ? WHERE id = ?",
+		int ($options -> {application_time}), 
+		int ($options -> {sql_time}), 
+		$options -> {out_html_time} ? int (1000 * (time - $options -> {out_html_time})) : 0, 
+		$r -> bytes_sent,
+		$options -> {is_gzipped},		 
+		$options -> {id_request_log},
+	);
+}
 1;

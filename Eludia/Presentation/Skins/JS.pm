@@ -1,7 +1,5 @@
 package Eludia::Presentation::Skins::JS;
 
-use JSON::XS;
-
 ################################################################################
 
 sub options {
@@ -49,7 +47,7 @@ EOJ
 			history.go (-1);
 			var data = $data;
 			alert (data [0]);
-			window.parent.document.body.style.cursor = 'normal';
+			window.parent.document.body.style.cursor = 'default';
 		}
 EOJ
 
@@ -100,5 +98,43 @@ sub static_path {
 	return $path;
 
 };
+
+################################################################################
+
+sub draw_form_field {
+
+	my ($_SKIN, $field, $data) = @_;
+	
+
+	if ($_REQUEST {__only_form}) {
+		my $js;
+		my @fields = split (',', $_REQUEST {__only_field});
+		my @tabs = split (',', $_REQUEST {__only_tabindex});
+		my $i;
+		for ($i = 0; $i < @fields; $i ++) {
+			last if $fields [$i] eq $field -> {name};
+		}
+		
+		my $a = $_JSON -> encode ([$field -> {html}]);
+		
+		$_REQUEST{__on_load} .= " load_$field->{name} (); ";
+			
+		$_REQUEST {__script} .= <<EOJS;
+	function load_$field->{name} () {
+		var a = $a;				
+		var doc = window.parent.document;				
+		var element = doc.forms ['$_REQUEST{__only_form}'].elements ['_$field->{name}'];
+		if (!element) element = doc.getElementById ('input_$field->{name}');
+		if (!element) return;					
+		element.outerHTML = a [0];
+		element.tabIndex = "$tabs[$i]";
+//		if (element.onChange) element.onChange ();
+	}
+EOJS
+		
+		return '';
+	}
+	
+}			
 
 1;

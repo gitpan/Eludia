@@ -1,5 +1,5 @@
-no warnings;
-
+no warnings; 
+  
 use Carp;
 use Data::Dumper;
 use DBI;
@@ -17,28 +17,44 @@ use Time::HiRes 'time';
 use URI::Escape;
 use Storable;
 use Net::SMTP;
-use JSON::XS;
-#use Math::FixedPrecision;
+ 
+use constant MP2 => (exists $ENV{MOD_PERL_API_VERSION} and $ENV{MOD_PERL_API_VERSION} >= 2 or $ENV{MOD_PERL} =~ m{mod_perl/1.99}); 
 
-use constant MP2 => ( exists $ENV{MOD_PERL_API_VERSION} and 
-                        $ENV{MOD_PERL_API_VERSION} >= 2 or $ENV{MOD_PERL} =~ m{mod_perl/1.99}); 
+BEGIN {
 
-BEGIN {	
-	if (MP2) {
+	our $Apache = 'Apache';
+	
+	if ($ENV{MOD_PERL_API_VERSION} >= 2) {
+		require Apache2::compat;
+		$Apache = 'Apache2';
+		$ENV{PERL_JSON_BACKEND} = 'JSON::PP'		
+	}
+	elsif (MP2) {
 		require Apache::RequestRec;
 		require Apache::RequestUtil;
 		require Apache::RequestIO;
 		require Apache::Const;
 		require Apache::Upload;
+		$ENV{PERL_JSON_BACKEND} = 'JSON::PP'		
 	} else {
 		require Apache::Constants;
 		Apache::Constants->import(qw(OK));
+		$ENV{PERL_JSON_BACKEND} = 'JSON::XS'		
 	}
   
 	$Data::Dumper::Sortkeys = 1;
+	
+	'$LastChangedDate: 2008-03-05 10:49:35 +0300 (Ср, 05 мар 2008) $' =~ /(\d\d)(\d\d)\-(\d\d)\-(\d\d)/;
+	
+	my $year = "$1$2";
 
-	$Eludia_VERSION      = $Eludia::VERSION      = '07.11.27';
-	$Eludia_VERSION_NAME = $Eludia::VERSION_NAME = 'Smallchange';
+	$Eludia::VERSION      = "$2.$3.$4";
+
+	'$LastChangedRevision: 1107 $' =~ /(\d+)/;
+	
+	$Eludia::VERSION     .= ".$1";
+
+	$Eludia_VERSION = $Eludia::VERSION;
 
 	eval {
 		require Math::FixedPrecision;
@@ -75,9 +91,19 @@ BEGIN {
 	my $docroot = $PACKAGE_ROOT -> [0];
 	$docroot =~ s{/lib(/.*)?}{/docroot/i/};
 	
+	if (open (IN, $0)) {
+		my $httpd_conf = join ('', <IN>);
+		close (IN);
+		if ($httpd_conf =~ /^\s*DocumentRoot\s+$/mi) {
+			$docroot = $';
+			$docroot =~ s/\"\'//g; #'"						
+		}
+		
+	}
+
 	if ($docroot) {
 
-		foreach my $subdir ('_skins', 'upload/dav_rw', 'upload/dav_ro') {
+		foreach my $subdir ('_skins', 'upload/dav_rw', 'upload/dav_ro', 'upload/images') {
 
 			my $dir = $docroot . $subdir;
 
@@ -135,23 +161,21 @@ BEGIN {
 		password => 1,
 		error => 1,
 	};
-	
-	our $_JSON ||= JSON::XS -> new -> latin1 (1);
-		
+			
 	unless ($ENV {ELUDIA_BANNER_PRINTED}) {
 
 		print STDERR "\n";
-		print STDERR " ----------------------------------------------------------------\n";
+		print STDERR " -------------------------------------------------------\n";
 		print STDERR "\n";
-		print STDERR " *****     *    ELUDIA / Perl                                    \n";
-		print STDERR "     *    *                                                      \n";
-		print STDERR "     *   *                                                       \n";
-		print STDERR " ********       Version: $Eludia_VERSION [$Eludia::VERSION_NAME] \n";
-		print STDERR "     * *                                                         \n";
-		print STDERR "     **                                                          \n";
-		print STDERR " *****          Copyright (c) 2002-2007 by Eludia                \n";
+		print STDERR " *****     *    ELUDIA / Perl\n";
+		print STDERR "     *    *\n";
+		print STDERR "     *   *\n";
+		print STDERR " ********       Version: $Eludia_VERSION\n";
+		print STDERR "     * *\n";
+		print STDERR "     **\n";
+		print STDERR " *****          Copyright (c) 2002-$year by Eludia\n";
 		print STDERR "\n";
-		print STDERR " ----------------------------------------------------------------\n\n";
+		print STDERR " -------------------------------------------------------\n\n";
 
 		$ENV {ELUDIA_BANNER_PRINTED} = 1;
 
@@ -163,10 +187,11 @@ BEGIN {
 		require DBIx::ModelUpdate;
 	}
 
-	if ($ENV {GATEWAY_INTERFACE} =~ m{^CGI/} || $conf -> {use_cgi} || $preconf -> {use_cgi}) {
+	if ($ENV {GATEWAY_INTERFACE} =~ m{^CGI/} || $preconf -> {use_cgi}) {
 		eval 'require CGI';
 	} else {
-		eval 'require Apache::Request';
+		eval "require ${Apache}::Request";
+
 		if ($@) {
 			warn "$@\n";
 
@@ -183,43 +208,48 @@ BEGIN {
 		delete $preconf -> {core_gzip};
 	};
 
+	if (MP2) {
+		eval "require JSON";
+		if ($@) {
+			delete $INC {'JSON.pm'};
+			delete $INC {'JSON/PP.pm'};
+			delete $INC {'JSON/XS.pm'};
+			require JSON::XS;
+		}
+	} else {
+		require JSON::XS;
+	}
+
 	our %INC_FRESH = ();	
 	while (my ($name, $path) = each %INC) {
 		delete $INC {$name} if $name =~ m{Eludia[\./]}; 
 	}
-
-	$conf = {%$conf, %$preconf};
-	if ($conf -> {core_load_modules}) {
 	
-		foreach my $module (qw(Config Content::menu Content::logon Presentation::logon)) {
-			require_fresh ($_PACKAGE . '::' . $module);
-		}	
-			
+	require_config ();
+
+	if ($preconf -> {core_load_modules}) {
+	
+		my @files = ("Content/menu.pm", "Content/logon.pm", "Presentation/logon.pm");
+				
 		if ($conf -> {auto_load}) {
 			
 			foreach my $type (@{$conf -> {auto_load}}) {				
 				push @files, "${_PACKAGE}/Content/$type.pm";
 				push @files, "${_PACKAGE}/Presentation/$type.pm";
 			}
-			
-			eval {
-				my $auto_load_expiry = $preconf -> {auto_load_expiry} || 5 * 24;
-				sql_do ('DELETE FROM __required_files WHERE unix_ts < ?', time - $auto_load_expiry * 60 * 60);
-				push @files, sql_select_col ('SELECT file_name FROM __required_files');
-			};						
-			
+						
 		}
 		else {
 		
 			foreach my $path (reverse (@$PACKAGE_ROOT)) {
+			
+				foreach my $dir ('Content', 'Presentation') {
 
-				opendir (DIR, "$path/Content") || die "can't opendir $PACKAGE_ROOT/Content: $!";
-				push @files, grep {/\.pm$/} map { "${_PACKAGE}/Content/$_" } readdir (DIR);
-				closedir DIR;	
+					opendir (DIR, "$path/$dir") || die "can't opendir $path/$dir: $!";
+					push @files, grep {/\.pm$/} map { "${_PACKAGE}/$dir/$_" } readdir (DIR);
+					closedir DIR;	
 
-				opendir (DIR, "$path/Presentation") || die "can't opendir $PACKAGE_ROOT/Presentation: $!";
-				push @files, grep {/\.pm$/} map { "${_PACKAGE}/Presentation/$_" } readdir (DIR);
-				closedir DIR;	
+				}
 
 			}
 						
@@ -238,12 +268,8 @@ BEGIN {
 		Apache -> push_handlers (PerlChildExitHandler => \&sql_disconnect);
 	}
 
-	if ($conf -> {db_dsn}) {
-		eval {	sql_disconnect;	};
-		warn $@ if $@;
-	}
-
 	print STDERR "\r Loading $pkg_banner ok.\n";
+
 }
 
 1;
@@ -304,19 +330,15 @@ and some more...
 
 =head1 APOLOGIES
 
-Using Eludia.pm requires some learning. We are unable to cite here a short synopsis suitable for copying / pasting and running. Ten lines will show nothing, and for structured content we prefer DocBook to POD. Thank you for understanding.
+Using Eludia.pm requires some learning. We are unable to cite here a short synopsis suitable for copying / pasting and running. Ten lines will show nothing, and for structured content we prefer MediaWiki. Thank you for understanding.
 
-We wrote an application developer manual. It is ~400K of DocBook sources, ~2M PDF, ~1.2M HTML Help, online version is of course available. An illustrated step-by-step crash course for newbies is included.
+We are really sorry, but it is in Russian only. We know, some people consider this insulting, but, honest, we force nobody to study our language. Writing such a manual en English is not easier to us than learning Russian to you.
 
-But, sorry, we are really sorry, it is in Russian only. We know, some people consider this insulting, but, honest, we force nobody to study our language. Writing such a manual en English is not easier to us than learning Russian to you.
-
-Having said that, we humbly invite all Russian-speaking Perl WEB developpers to visit L<http://dev.eludia.ru/docs>.
+Having said that, we humbly invite all Russian-speaking Perl WEB developpers to visit L<http://eludia.ru/wiki>. Volunteer translators are, of course, welcome.
 
 =head1 DISCLAIMER
 
 The authors of Eludia.pm DOES NOT follow certain rules widely considered as "good style" attributes. We DO NOT recommend using Eludia.pm to any person who believe that formal accordance with these rules come first to factual quality and performance. NOR we beg from people who obviously will never use our software for exploring and "assessing" it.
-
-=back
 
 =head1 AUTHORS
 

@@ -20,15 +20,15 @@ sub get_request {
 	}
 	else {
 
-		our $use_cgi = $ENV {SCRIPT_NAME} =~ m{index\.pl} || ($ENV {GATEWAY_INTERFACE} =~ m{^CGI/} && !$ENV{MOD_PERL}) || $conf -> {use_cgi} || $preconf -> {use_cgi} || !$INC{'Apache/Request.pm'};
+		our $use_cgi = $ENV {SCRIPT_NAME} =~ m{index\.pl} || ($ENV {GATEWAY_INTERFACE} =~ m{^CGI/} && !$ENV{MOD_PERL}) || $preconf -> {use_cgi} || !$INC{"${Apache}/Request.pm"};
 		our $r   = $use_cgi ? new Eludia::Request ($preconf, $conf) : $_[0];
-		our $apr = $use_cgi ? $r : ($Eludia::Auth::NTLM::apr || Apache::Request -> new ($r));
+		our $apr = $use_cgi ? $r : ("${Apache}::Request" -> new ($r));
 
 	}
 
-	if (ref $apr eq 'Apache::Request') {
-		require Apache::Cookie;
-		our %_COOKIES = Apache::Cookie -> fetch ($r);
+	if (ref $apr eq "${Apache}::Request") {
+		eval "require ${Apache}::Cookie";
+		our %_COOKIES = "${Apache}::Cookie" -> fetch; # ($r);
 	}
 	elsif ($ENV {SERVER_SOFTWARE} =~ /IIS/) {
 		our %_COOKIES = ();
@@ -38,8 +38,11 @@ sub get_request {
 		require CGI::Cookie;
 		our %_COOKIES = CGI::Cookie -> fetch;
 	}
+	
 
 }
+
+#################################################################################
 
 sub setup_skin {
 
@@ -52,7 +55,7 @@ sub setup_skin {
 		if ($_REQUEST {xls}) {
 			$_REQUEST {__skin} = 'XL';
 		}
-		elsif ($_REQUEST {__dump} || $_REQUEST {__d}) {
+		elsif (($_REQUEST {__dump} || $_REQUEST {__d}) && $preconf -> {core_show_dump}) {
 			$_REQUEST {__skin} = 'Dumper';
 		}
 		elsif ($_REQUEST {__proto}) {
@@ -81,86 +84,119 @@ sub setup_skin {
 	eval "require $_SKIN";
 	warn $@ if $@;
 
+	our $_JS_SKIN = "Eludia::Presentation::Skins::JS";
+	eval "require $_JS_SKIN";
+	warn $@ if $@;
+	
+	$_REQUEST {__static_site} = '';
+	
+	if ($preconf -> {static_site}) {
+	
+		if (ref $preconf -> {static_site} eq CODE) {
+		
+			$_REQUEST {__static_site} = &{$preconf -> {static_site}} ();
+		
+		}
+		elsif (! ref $preconf -> {static_site}) {
+
+			$_REQUEST {__static_site} = $preconf -> {static_site};
+
+		}
+		else {
+		
+			die "Invalid \$preconf -> {static_site}: " . Dumper ($preconf -> {static_site});
+		
+		}
+			
+	}	
+	
 	$_REQUEST {__static_url}  = '/i/_skins/' . $_REQUEST {__skin};
 	$_REQUEST {__static_salt} = $_REQUEST {sid} || rand ();
 
 	$_SKIN -> {options} ||= $_SKIN -> options;
 
 	$_REQUEST {__no_navigation} ||= $_SKIN -> {options} -> {no_navigation};
+	
+	check_static_files ();
+	
+	$_REQUEST {__static_url} = $_REQUEST {__static_site} . $_REQUEST {__static_url} if $_REQUEST {__static_site};
 
-	if (
-		!$_SKIN -> {static_ok} &&
-		!$_SKIN -> {options} -> {no_presentation} &&
-		!$_SKIN -> {options} -> {no_static} &&
-		$r
-	) {
+	our $_JSON = $INC {'JSON.pm'} ? JSON -> new -> latin1 (1) : JSON::XS -> new -> latin1 (1);
 
-		my $skin_root = $r -> document_root () . $_REQUEST {__static_url};
-		-d $skin_root or mkdir $skin_root;
-		my $skin_VERSION = '';
+	foreach my $package ($_SKIN, $_JS_SKIN) {
 
-		eval {
-			open (V, "$skin_root/VERSION");
-			($skin_VERSION) = (<V>);
-			close (V);
-		};
-
-		unless ($skin_version eq $Eludia_VERSION) {
-
-			my $static_path = $_SKIN -> static_path;
-
-			opendir (DIR, $static_path) || die "can't opendir $static_path: $!";
-			my @files = readdir (DIR);
-			closedir DIR;
-
-			my $buf;
-
-			foreach my $src (@files) {
-
-				$src =~ /\.pm$/ or next;
-
-				my $dst = '>' . $skin_root . '/' . $`;
-
-				$src = $static_path . $src;
-
-				open (S, $src) || die "can't open $src: $!";
-				read S, $buf, -s $src;
-				close (S);
-
-				open (D, $dst) || die "can't write to $dst: $!";
-				binmode (D);
-				print D $buf;
-				close (D);
-
-			}
-
-			open (D, '>' . $skin_root . '/VERSION') || die "can't write to VERSION: $!";
-			binmode (D);
-			print D $Eludia_VERSION;
-			close (D);
-
-		}
-
-		$_SKIN -> {static_ok} = 1;
+		attach_globals ($_PACKAGE => $package, qw(
+			_PACKAGE
+			_REQUEST
+			_USER
+			SQL_VERSION
+			conf
+			preconf
+			r
+			i18n
+			create_url
+			_SUBSET
+			_JSON
+			tree_sort
+			adjust_esc
+		));
 
 	}
 
-	attach_globals ($_PACKAGE => $_SKIN, qw(
-		_PACKAGE
-		_REQUEST
-		_USER
-		Eludia_VERSION_NAME
-		SQL_VERSION
-		conf
-		preconf
-		r
-		i18n
-		create_url
-		_SUBSET
-		_JSON
-	));
+}
+
+#################################################################################
+
+sub check_static_files {
+
+	return if $_SKIN -> {static_ok};
+	return if $_SKIN -> {options} -> {no_presentation};
+	return if $_SKIN -> {options} -> {no_static};
+	$r or return;
+	
+	my $skin_root = $r -> document_root () . $_REQUEST {__static_url};
+		
+	-d $skin_root or mkdir $skin_root or die "Can't create $skin_root: $!";
+
+	my $static_path = $_SKIN -> static_path;
+
+	opendir (DIR, $static_path) || die "can't opendir $static_path: $!";
+	my @files = readdir (DIR);
+	closedir DIR;
+
+	foreach my $src (@files) {
+		$src =~ /\.pm$/ or next;
+		File::Copy::copy ($static_path . $src, $skin_root . '/' . $`) or die "can't copy ${static_path}${src} to ${skin_root}/${`}: $!";
+	}
+	
+	my $favicon = $r -> document_root () . '/i/favicon.ico';
+	
+	if (-f $favicon) {
+		
+		File::Copy::copy ($favicon, $skin_root . '/favicon.ico') or die "can't copy favicon.ico: $!";
+		
+	}
+
+	my $over_root = $r -> document_root () . '/i/skins/' . $_REQUEST {__skin};
+
+	if (-d $over_root) {
+
+		opendir (DIR, $over_root) || die "can't opendir $over_root: $!";
+		my @files = readdir (DIR);
+		closedir DIR;
+
+		foreach my $src (@files) {
+			$src =~ /\w\.\w+$/ or next;
+			File::Copy::copy ($over_root . '/' . $src,  $skin_root . '/' . $src) or die "can't copy $src: $!";
+		}
+
+	}
+		
+	$_SKIN -> {static_ok} = 1;
 
 }
+
+#################################################################################
 
 sub handler {
 
@@ -170,7 +206,11 @@ sub handler {
 
 	get_request (@_);
 
-	my $parms = $apr -> parms;
+	my $time = $r -> request_time ();
+	my $first_time = $time;
+	$_REQUEST {__sql_time} = 0;
+
+	my $parms = ref $apr eq 'Apache2::Request' ? $apr -> param : $apr -> parms;
 	undef %_REQUEST;
 	our %_REQUEST = %{$parms};
 
@@ -188,7 +228,8 @@ sub handler {
 	$_REQUEST {__uri} =~ s{\?.*}{};
 	$_REQUEST {__uri} =~ s{^/+}{/};
 	$_REQUEST {__uri} =~ s{\&salt\=[\d\.]+}{}gsm;
-#	$_REQUEST {__uri_root} =  $_REQUEST {__uri} . '?sid=' . $_REQUEST {sid} . '&salt=' . rand * time;
+	
+	$_REQUEST {__script_name} = $ENV {SERVER_SOFTWARE} =~ /IIS\/5/ ? $ENV {SCRIPT_NAME} : '';
 
 	$_REQUEST {__windows_ce} = $r -> headers_in -> {'User-Agent'} =~ /Windows CE/ ? 1 : undef;
 	if ($_REQUEST {fake}) {
@@ -219,20 +260,21 @@ sub handler {
 
 	}
 
-   	sql_reconnect ();
-
-	require_fresh ($_PACKAGE . 'Config');
+	my $request_time = 1000 * (time - $first_time);
 	
-	sql_assert_core_tables ();
+	$time = __log_profilinig ($time, '<REQUEST>');
+	
+	require_config ({no_db => 1});
+   	sql_reconnect ();   	
+	require_config ();
 
+	__log_request_profilinig ($request_time);
+
+	$time = __log_profilinig ($time, '<require_config>');
+	
 	if ($r -> uri =~ m{/(\w+)\.(css|gif|ico|js|html)$}) {
 
 		my $fn = "$1.$2";
-
-		if ($fn eq 'favicon.ico' && -f $r -> document_root () . '/i/favicon.ico') {
-			$r -> internal_redirect ('/i/favicon.ico');
-			return OK;
-		}
 
 		setup_skin ();
 
@@ -266,7 +308,11 @@ EOH
 		return OK;
 	}
 
+	$time = __log_profilinig ($time, '<misc>');
+
 	our $_USER = get_user ();
+
+	$time = __log_profilinig ($time, '<got user>');
 
 	$number_format or our $number_format = Number::Format -> new (%{$conf -> {number_format}});
 
@@ -511,7 +557,7 @@ EOH
 				}
 				elsif (!$_REQUEST {__response_sent}) {
 
-					if ($action eq 'delete' && $conf -> {core_auto_esc} == 2) {
+					if ($action eq 'delete') {
 						esc ({label => $_REQUEST {__redirect_alert}});
 					}
 					else {
@@ -542,35 +588,46 @@ EOH
 
 		}
 		else {
-
-#		   	sql_reconnect ();
-
-			if (
-				$conf -> {core_auto_esc} == 2 &&
-				$_REQUEST {sid} &&
-				!$_REQUEST {__top} &&
-				(
-					$r -> headers_in -> {'Referer'} =~ /action=\w/ ||
-					$r -> headers_in -> {'Referer'} !~ /__last_query_string=$_REQUEST{__last_query_string}/ ||
-					$r -> headers_in -> {'Referer'} !~ /type=$_REQUEST{type}(\W.*)?$/
-				)
-			) {
-
-				my ($method, $url) = split /\s+/, $r -> the_request;
-
-				$url =~ s{\&?_?salt=[\d\.]+}{}gsm;
-				$url =~ s{\&?sid=\d+}{}gsm;
-
-				my $no = sql_select_scalar ("SELECT no FROM $conf->{systables}->{__access_log} WHERE id_session = ? AND href LIKE ?", $_REQUEST {sid}, $url);
-
-				unless ($no) {
-					$no = 1 + sql_select_scalar ("SELECT MAX(no) FROM $conf->{systables}->{__access_log} WHERE id_session = ?", $_REQUEST {sid});
-					sql_do ("INSERT INTO $conf->{systables}->{__access_log} (id_session, no, href) VALUES (?, ?, ?)", $_REQUEST {sid}, $no, $url);
+		
+			if ($_REQUEST {sid} && !$_REQUEST {__top}) {
+						
+				my @qs = split /\?/, $r -> headers_in -> {Referer};
+				
+				my %p = ();
+				
+				foreach (split /\&/, $qs [-1]) {
+				
+					my ($k, $v) = split /\=/;
+					
+					$p {$k} = $v;
+				
 				}
 
-				$_REQUEST {__last_query_string} = $no;
+				if (
+					$p {action} 
+					|| $_REQUEST {__next_query_string}
+					|| $p {__last_query_string} != $_REQUEST{__last_query_string}
+					|| $p {type} ne $_REQUEST {type}
+				) {
 
-				$_REQUEST {__last_last_query_string} ||= $_REQUEST {__last_query_string};
+					my ($method, $url) = split /\s+/, $r -> the_request;
+
+					$url =~ s{\&?_?salt=[\d\.]+}{}gsm;
+					$url =~ s{\&?sid=\d+}{}gsm;
+					$url =~ s{\&?__next_query_string=\d+}{}gsm;
+
+					my $no = sql_select_scalar ("SELECT no FROM $conf->{systables}->{__access_log} WHERE id_session = ? AND href LIKE ?", $_REQUEST {sid}, $url);
+
+					unless ($no) {
+						$no = 1 + sql_select_scalar ("SELECT MAX(no) FROM $conf->{systables}->{__access_log} WHERE id_session = ?", $_REQUEST {sid});
+						sql_do ("INSERT INTO $conf->{systables}->{__access_log} (id_session, no, href) VALUES (?, ?, ?)", $_REQUEST {sid}, $no, $url);
+					}
+
+					$_REQUEST {__last_query_string} = $no;
+
+					$_REQUEST {__last_last_query_string} ||= $_REQUEST {__last_query_string};
+				
+				}
 
 			}
 
@@ -582,12 +639,22 @@ EOH
 
 	}
 
-#   	$db -> disconnect;
+	$r -> pool -> cleanup_register (\&__log_request_finish_profilinig, {
+		id_request_log		=> $_REQUEST {_id_request_log}, 
 
+		out_html_time		=> $_REQUEST {__out_html_time},
+		application_time	=> 1000 * (time - $first_time) - $_REQUEST {__sql_time}, 
+		sql_time		=> $_REQUEST {__sql_time},
+		is_gzipped		=>  $_REQUEST {__is_gzipped},
+		
+	}) if $preconf -> {core_debug_profiling} > 2;
+	
 	if ($_REQUEST {__suicide}) {
 		$r -> print (' ' x 8096);
 		CORE::exit (0);
 	}
+
+	__log_profilinig ($first_time, '<TOTAL>');
 
 	return OK;
 
@@ -600,8 +667,12 @@ sub out_html {
 	my ($options, $html) = @_;
 
 	$html or return;
-
+	
 	return if $_REQUEST {__response_sent};
+
+	my $time = time;
+
+	$_REQUEST {__out_html_time} = $time;  
 
 	if ($conf -> {core_sweep_spaces}) {
 		$html =~ s{^\s+}{}gsm;
@@ -633,6 +704,7 @@ sub out_html {
 		$r -> content_encoding ('gzip');
 		unless ($_REQUEST {__is_gzipped}) {
 			$html = Compress::Zlib::memGzip ($html);
+			$_REQUEST {__is_gzipped} = 1;
 		}
 	}
 
@@ -652,8 +724,9 @@ sub out_html {
 
 	$r -> send_http_header unless (MP2);
 
-	$r -> header_only or print $html;
+	$r -> header_only && !MP2 or print $html;
 
+	__log_profilinig ($time, ' <out_html: ' . (length $html) . ' bytes>');
 }
 
 #################################################################################

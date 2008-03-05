@@ -465,13 +465,15 @@ sub sql_select_subtree {
 
 	my ($table_name, $id, $options) = @_;
 	
+	$options -> {filter} = " AND $options->{filter}"
+		if $options->{filter};
 	my @ids = ($id);
 	
 	while (TRUE) {
 	
 		my $ids = join ',', @ids;
 	
-		my @new_ids = sql_select_col ("SELECT id FROM $table_name WHERE parent IN ($ids) AND id NOT IN ($ids)");
+		my @new_ids = sql_select_col ("SELECT id FROM $table_name WHERE fake = 0 AND parent IN ($ids) AND id NOT IN ($ids) $options->{filter}");
 		
 		last unless @new_ids;
 	
@@ -638,6 +640,8 @@ sub sql_upload_file {
 	
 	my ($options) = @_;
 
+	$options -> {id} ||= $_REQUEST {id};
+
 	my $uploaded = upload_file ($options) or return;
 		
 	sql_delete_file ($options);
@@ -659,7 +663,7 @@ sub sql_upload_file {
 	
 	my $tail = join ', ', @fields;
 		
-	sql_do ("UPDATE $$options{table} SET $tail WHERE id = ?", @params, $_REQUEST {id});
+	sql_do ("UPDATE $$options{table} SET $tail WHERE id = ?", @params, $options -> {id});
 	
 	return $uploaded;
 	

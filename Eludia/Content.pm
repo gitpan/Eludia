@@ -325,8 +325,9 @@ sub send_mail {
 		$to = sql_select_hash ("SELECT label, mail FROM $conf->{systables}->{users} WHERE id = ?", $to);
 	}
 
+	my $original_to;
 	if ($preconf -> {mail} -> {to}) {
-		$options -> {text} .= Dumper ($to);
+		$original_to = '' . Dumper ($to);
 		$to = $preconf -> {mail} -> {to};
 	}
 
@@ -362,11 +363,20 @@ sub send_mail {
 	if ($options -> {href}) {	
 		my $server_name = $preconf -> {mail} -> {server_name} || $ENV{HTTP_HOST};
 		$options -> {href} =~ /^http/ or $options -> {href} = "http://$server_name" . $options -> {href};
+	}
+
+	if ($options -> {template}) {
+		our $DATA = $options -> {data} if $options -> {data};
+		$DATA -> {href} = $options -> {href};
+		$options -> {text} = fill_in_template ($options -> {template}, '', {no_print => 1});
+		undef $DATA if $options -> {data};
+	}
+	elsif ($options -> {href}) {
 		$options -> {href} = "<br><br><a href='$$options{href}'>$$options{href}</a>" if $options -> {content_type} eq 'text/html';
 		$options -> {text} .= "\n\n" . $options -> {href};
 	}
-#	my $text = encode_qp ($options -> {text});
-	my $text = encode_base64 ($options -> {text});
+	
+	my $text = encode_base64 ($options -> {text} . "\n" . $original_to);
 	
 	unless ($^O eq 'MSWin32') {
 		defined (my $child_pid = fork) or die "Cannot fork: $!\n";
@@ -376,10 +386,24 @@ sub send_mail {
 		##### connecting...
 
 	my $repeat = 10;
+	
 	my $smtp = undef;
-	while ($repeat || !defined $smtp) {
-		$smtp = Net::SMTP -> new ($preconf -> {mail} -> {host});
+	
+	while ($repeat) {
+
 		$repeat--;
+
+		$smtp = Net::SMTP -> new ($preconf -> {mail} -> {host}, %{$preconf -> {mail} -> {options}});
+
+		$smtp or next;
+		
+		if ($preconf -> {mail} -> {user}) {
+			$smtp -> auth ($preconf -> {mail} -> {user}, $preconf -> {mail} -> {password}) or die "SMTP AUTH error: " . $smtp -> code . ' ' . $smtp -> message;
+		}
+		
+		last if $smtp;
+
+
 	}	
 
 	unless (defined $smtp) {
@@ -530,7 +554,7 @@ sub require_fresh {
 
 	my ($module_name, $fatal) = @_;	
 
-#print STDERR ("require_fresh ('$module_name') called...\n");
+	check_systables ();
 	
 	my $file_name = $module_name;
 	$file_name =~ s{(::)+}{\/}g;
@@ -551,6 +575,8 @@ sub require_fresh {
 		$the_path =~ s{[\\\/]*(Content|Presentation)}{};
 		last;
 	}
+	
+	my $is_config = $file_name =~ /Config\.pm$/ ? 1 : 0;
 
 	$found or return "File not found: $file_name\n";
 	
@@ -558,12 +584,12 @@ sub require_fresh {
 	
 	my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $last_modified, $ctime, $blksize, $blocks);
 
-	if ($need_refresh) {
+	if ($need_refresh && (!$is_config || !$CONFIG_IS_LOADED)) {
 		($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $last_modified, $ctime, $blksize, $blocks) = stat ($file_name);
 		my $last_load = $INC_FRESH {$module_name} + 0;
 		$need_refresh = $last_load < $last_modified;
 	}
-		
+
 	if ($need_refresh) {
 	
 		if ($_OLD_PACKAGE) {
@@ -580,10 +606,13 @@ sub require_fresh {
 
 		die $@ if $@;
 
-		sql_assert_core_tables () if $file_name =~ /Config\.pm$/;
+		if ($is_config) {
+			check_systables ();
+			sql_assert_core_tables ();
+		}
 
 		if (
-			$file_name =~ /Config\.pm$/
+			$is_config
 			&& $DB_MODEL
 			&& !exists $DB_MODEL -> {tables}
 		) {
@@ -594,12 +623,18 @@ sub require_fresh {
 		}
 
 		if (
-			$db
-			&& $last_modified > 0 + sql_select_scalar ("SELECT unix_ts FROM $conf->{systables}->{__required_files} WHERE file_name = ?", $module_name)
+			$db && (
+				!$CONFIG_IS_LOADED || (
+					$last_modified > 0 + sql_select_scalar (
+						"SELECT unix_ts FROM $conf->{systables}->{__required_files} WHERE file_name = ?",
+						$module_name
+					)
+				)
+			)
 		) {
 				
 			my $__last_update = sql_select_scalar ("SELECT unix_ts FROM $conf->{systables}->{__last_update}");
-			my $__time = time ();
+			my $__time = int(time ());
 
 			if ($DB_MODEL && !$DB_MODEL -> {splitted}) {
 
@@ -707,7 +742,7 @@ print STDERR "[$$] OK, $name is up to date\n";
 				eval {
 
 					my $__last_update = sql_select_scalar ("SELECT unix_ts FROM $conf->{systables}->{__last_update}");
-					my $__time = time ();
+					my $__time = int(time ());
 
 					opendir (DIR, "$the_path/Updates") || die "can't opendir $the_path/Updates: $!";
 					my @scripts = readdir (DIR);
@@ -784,7 +819,7 @@ print STDERR "[$$] OK, $script is over and out.\n";
 		
 		if ($db && $db -> ping) {
 			sql_do ("DELETE FROM $conf->{systables}->{__required_files} WHERE file_name = ?", $module_name);
-			sql_do ("INSERT INTO $conf->{systables}->{__required_files} (file_name, unix_ts) VALUES (?, ?)", $module_name, time);
+			sql_do ("INSERT INTO $conf->{systables}->{__required_files} (file_name, unix_ts) VALUES (?, ?)", $module_name, int(time));
 		}
 	
 		$INC_FRESH {$module_name} = $last_modified;
@@ -794,7 +829,10 @@ print STDERR "[$$] OK, $script is over and out.\n";
         if ($@) {
 		$_REQUEST {error} = $@;
 		print STDERR "require_fresh: error load module $module_name: $@\n";
-        }	
+        }
+        else {
+        	$CONFIG_IS_LOADED ||= $is_config if $db;
+        }
         
         return $@;
 	
@@ -803,30 +841,6 @@ print STDERR "[$$] OK, $script is over and out.\n";
 ################################################################################
 
 sub add_totals {
-
-#	my ($ar, $options) = @_;	
-#	my $totals = {};
-	
-#	foreach my $r (@$ar) {
-		
-#		foreach my $key (keys %$r) {
-			
-#			next if $key =~ /^id|label$/;
-			
-#			$totals -> {$key} += $r -> {$key};
-			
-#		}
-		
-#	}
-	
-#	$totals -> {label} = 'Итого';
-	
-#	$options -> {position} = 0 + @$ar unless defined $options -> {position};
-	
-#	splice (@$ar, $options -> {position}, 0, $totals);
-
-
-
 
 	my ($ar, $options) = @_;
 
@@ -953,13 +967,58 @@ sub add_totals {
 	
 }
 
-
 ################################################################################
 
 sub do_add_DEFAULT {
 	
 	sql_do_relink ($_REQUEST {type}, [get_ids ('clone')] => $_REQUEST {id});
 
+}
+
+################################################################################
+
+sub do_kill_DEFAULT {
+	
+	foreach my $id (get_ids ($_REQUEST {type})) {
+	
+		sql_do ("UPDATE $_REQUEST{type} SET fake = -1 WHERE id = ?", $id);
+		
+	}
+
+}
+
+################################################################################
+
+sub do_unkill_DEFAULT {
+	
+	my $extra = '';
+	$extra .= ', is_merged_to = 0' if $DB_MODEL -> {tables} -> {$table_name} -> {columns} -> {is_merged_to};
+	$extra .= ', id_merged_to = 0' if $DB_MODEL -> {tables} -> {$table_name} -> {columns} -> {id_merged_to};
+	
+	foreach my $id (get_ids ($_REQUEST {type})) {
+	
+		sql_do ("UPDATE $_REQUEST{type} SET fake = 0 $extra WHERE id = ?", $id);
+
+		sql_undo_relink ($_REQUEST{type}, $_REQUEST{id});
+		
+	}
+
+	$_REQUEST {fake} = 0;
+
+}
+
+################################################################################
+
+sub validate_kill_DEFAULT {
+	get_ids ($_REQUEST {type}) > 0 or return 'Вы не выделили ни одной строки';
+	return undef;
+}
+
+################################################################################
+
+sub validate_unkill_DEFAULT {
+	get_ids ($_REQUEST {type}) > 0 or return 'Вы не выделили ни одной строки';
+	return undef;
 }
 
 ################################################################################
@@ -993,8 +1052,10 @@ sub do_create_DEFAULT {
 ################################################################################
 
 sub do_update_DEFAULT {
-	
-	sql_upload_file ({
+
+	my $columns = $model_update -> get_columns ($_REQUEST {type});
+
+	my $options = {
 		name => 'file',
 		dir => 'upload/images',
 		table => $_REQUEST{type},
@@ -1002,10 +1063,12 @@ sub do_update_DEFAULT {
 		size_column => 'file_size',
 		type_column => 'file_type',
 		path_column => 'file_path',
-	});
-		
-	my $columns = $model_update -> get_columns ($_REQUEST {type});
+	};
 	
+	$options -> {body_column} = 'file_body' if $columns -> {file_body};
+	
+	sql_upload_file ($options);
+			
 	my @fields = ();
 	
 	foreach my $key (keys %_REQUEST) {	
@@ -1024,15 +1087,21 @@ sub do_update_DEFAULT {
 
 sub do_download_DEFAULT {
 
-	sql_download_file ({
-		name => 'file',
+	my $name = $_REQUEST {_name} || 'file';
+	
+	my $options = {
+		name => $name,
 		dir => 'upload/images',
 		table => $_REQUEST{type},
-		file_name_column => 'file_name',
-		size_column => 'file_size',
-		type_column => 'file_type',
-		path_column => 'file_path',
-	});
+		file_name_column => $name . '_name',
+		size_column => $name . '_size',
+		type_column => $name . '_type',
+		path_column => $name . '_path',
+	};
+	
+	$options -> {body_column} = $name . '_body' if $DB_MODEL -> {tables} -> {$_REQUEST {type}} -> {columns} -> {$name . '_body'};
+
+	sql_download_file ($options);
 
 }
 
@@ -1089,25 +1158,29 @@ sub call_for_role {
 	
 		my $result = &$name_to_call (@_);
 
-		if ($preconf -> {core_debug_profiling} == 2) {
+		if ($preconf -> {core_debug_profiling} > 1) {
 
+			my $id = sql_select_scalar ("SELECT id FROM $conf->{systables}->{__benchmarks} WHERE label = ?", $sub_name);
+			unless ($id) {
+				sql_do_insert ($conf->{systables}->{__benchmarks}, {fake => 0, label => $sub_name});
+			}
 
 			sql_do (
 				"UPDATE $conf->{systables}->{__benchmarks} SET cnt = cnt + 1, ms = ms + ?, selected = selected + ?  WHERE id = ?",
-				1000 * (time - $time),
+				int(1000 * (time - $time)),
 				$_REQUEST {__benchmarks_selected},
-				sql_select_id ($conf->{systables}->{__benchmarks}, {fake => 0, label => $sub_name}, ['label']),
+				$id,
 			);
 
 			
 			sql_do (
 				"UPDATE $conf->{systables}->{__benchmarks} SET  mean = ms / cnt, mean_selected = selected / cnt WHERE id = ?",
-				sql_select_id ($conf->{systables}->{__benchmarks}, {fake => 0, label => $sub_name}, ['label']),
+				$id,
 			);
 			
 		}
 		elsif ($preconf -> {core_debug_profiling} == 1) {
-			warn "Profiling [$$] " . 1000 * (time - $time) . " ms $name_to_call\n";
+			__log_profilinig ($time, ' ' . $name_to_call);
 		}
 		
 		return $result;
@@ -1126,31 +1199,40 @@ sub call_for_role {
 
 ################################################################################
 
+sub __log_profilinig {
+
+	printf STDERR "Profiling [$$] %20.10f ms %s\n", 1000 * (time - $_[0]), $_[1] if ($preconf -> {core_debug_profiling} > 0);
+	
+	return time ();
+
+}
+
+################################################################################
+
 sub select_subset { return {} }
 
 ################################################################################
 
 sub get_user {
-
 	return if $_REQUEST {type} eq '_static_files';
 
 	sql_do_refresh_sessions ();
 
 	my $user = undef;
-	
+
 	if ($_REQUEST {__login}) {
 		$user = sql_select_hash ("SELECT * FROM $conf->{systables}->{users} WHERE login = ? AND password = PASSWORD(?) AND fake <> -1", $_REQUEST {__login}, $_REQUEST {__password});
 		$user -> {id} or undef $user;
 	}
 	
 	my $peer_server = undef;
-	
+
 	if ($r -> headers_in -> {'User-Agent'} =~ m{^Eludia/.*? \((.*?)\)}) {
-	
+
 		$peer_server = $1;
 
 		my $local_sid = sql_select_scalar ("SELECT id FROM $conf->{systables}->{sessions} WHERE peer_id = ? AND peer_server = ?", $_REQUEST {sid}, $peer_server);
-		
+
 		unless ($local_sid) {
 		
 			my $user = peer_query ($peer_server, {__whois => $_REQUEST {sid}});
@@ -1306,8 +1388,9 @@ sub interpolate {
 ################################################################################
 
 sub get_filehandle {
-#	return $q -> upload ($_[0]);	
-	return $apr -> upload ($_[0]) -> fh;	
+
+	return ref $apr eq 'Apache2::Request' ? $apr -> upload ($_[0]) -> upload_fh : $apr -> upload ($_[0]) -> fh;	
+
 }
 
 ################################################################################
@@ -1417,25 +1500,27 @@ sub select__boot {
 
 ################################################################################
 
-sub download_file {
+sub download_file_header {
 
 	my ($options) = @_;	
-		
+
 	$r -> status (200);
 
 	$options -> {file_name} =~ s{.*\\}{};
 		
 	my $type = 
-		$options -> {charset} ? $options -> {'ty' . "pe"} . '; charset=' . $options -> {charset} :
-		$options -> {'ty' . "pe"};
+		$options -> {charset} ? $options -> {type} . '; charset=' . $options -> {charset} :
+		$options -> {type};
 
 	$type ||= 'application/octet-stream';
 
 	my $path = $r -> document_root . $options -> {path};
 	
 	my $start = 0;
-	my $content_length = -s $path;
+	my $content_length = $options -> {size} || -s $path;
+	
 	my $range_header = $r -> headers_in -> {"Range"};
+
 	if ($range_header =~ /bytes=(\d+)/) {
 		$start = $1;
 		my $finish = $content_length - 1;
@@ -1450,17 +1535,32 @@ sub download_file {
 	
 	$r -> send_http_header () unless (MP2);
 
+	$_REQUEST {__response_sent} = 1;
+	
+	return $start;
+
+}
+
+################################################################################
+
+sub download_file {
+
+	my ($options) = @_;	
+
+	my $path = $r -> document_root . $options -> {path};
+
+	$_REQUEST {__out_html_time} = time;
+
+	my $start = download_file_header (@_);
+	
 	if (MP2) {
-		$r->sendfile($path, $start);
+		$r -> sendfile ($path, $start);
 	} else {
 		open (F, $path) or die ("Can't open file $path: $!");
 		seek (F, $start, 0);
 		$r -> send_fd (F);
 		close F;
 	}
-
-
-	$_REQUEST {__response_sent} = 1;
 	
 }
 
@@ -1472,12 +1572,30 @@ sub upload_file {
 	
 	my $upload = $apr -> upload ('_' . $options -> {name});
 	
-	return undef unless ($upload and $upload -> size > 0);
+	my ($fh, $filename, $file_size, $file_type);
+
+	if (ref $apr eq 'Apache2::Request') {
 	
-	my $fh = $upload -> fh;
+		return undef unless ($upload and $upload -> upload_size > 0);
+		
+		$fh = $upload -> upload_fh;
+		$filename = $upload -> upload_filename;
+		$file_size = $upload -> upload_size;
+		$file_type = $upload -> upload_type;
+		  
+	} else {
 	
-	$upload -> filename =~ /[A-Za-z0-9]+$/;
+		return undef unless ($upload and $upload -> size > 0);
+
+		$fh = $upload -> fh;
+		$filename = $upload -> filename;
+		$file_size = $upload -> size;
+		$file_type = $upload -> type;
+
+		
+	}
 	
+	$filename =~ /[A-Za-z0-9]+$/;
 	my $path = "/i/$$options{dir}/" . time . "-$$.$&";
 	
 	my $real_path = $r -> document_root . $path;
@@ -1493,13 +1611,12 @@ sub upload_file {
 	}
 	close (OUT);
 	
-	my $filename = $upload -> filename;
 	$filename =~ s{.*\\}{};
 	
 	return {
 		file_name => $filename,
-		size      => $upload -> size,
-		type      => $upload -> type,
+		size      => $file_size,
+		type      => $file_type,
 		path      => $path,
 		real_path => $real_path,
 	}
@@ -1538,9 +1655,9 @@ sub add_vocabularies {
 
 sub set_cookie {
 
-	if (ref $r eq 'Apache') {
-		require Apache::Cookie;
-		my $cookie = Apache::Cookie -> new ($r, @_);
+	if (ref $r eq $Apache) {
+		eval "require ${Apache}::Cookie";
+		my $cookie = "${Apache}::Cookie" -> new ($r, @_);
 		$cookie -> bake;
 	}
 	else {
@@ -1604,6 +1721,42 @@ EOS
 	
 }
 
+################################################################################
+
+sub select__sql_benchmarks {
+
+	my $q = '%' . $_REQUEST {q} . '%';
+
+	my $start = $_REQUEST {start} + 0;
+	
+	my $order = order ('mean DESC',
+		ms            => 'ms  DESC',
+		cnt           => 'cnt DESC',
+		selected      => 'selected  DESC',
+		mean_selected => 'mean_selected DESC',
+		label         => 'label',
+	);
+
+	my ($_benchmarks, $cnt)= sql_select_all_cnt (<<EOS, $q);
+		SELECT
+			*
+		FROM
+			$conf->{systables}->{__sql_benchmarks}
+		WHERE
+			(label LIKE ?)
+		ORDER BY
+			$order
+		LIMIT
+			$start, $$conf{portion}
+EOS
+
+	return {
+		_benchmarks => $_benchmarks,
+		cnt => $cnt,
+		portion => $$conf{portion},
+	};
+	
+}
 ################################################################################
 
 sub select__info {
@@ -1672,12 +1825,6 @@ sub select__info {
 			label => 'DBD::' . $db -> {Driver} -> {Name} . ' ' . ${'DBD::' . $db -> {Driver} -> {Name} . '::VERSION'},
 			path  => $INC {'DBD/' . $SQL_VERSION -> {driver} . '.pm'},
 		},
-
-		{
-			id    => 'DB maintainer',
-			label => 'DBIx::ModelUpdate ' . $DBIx::ModelUpdate::VERSION,
-			path  => $INC {'DBIx/ModelUpdate.pm'},
-		},
 		
 		{			
 			id    => 'Parameters module',
@@ -1686,7 +1833,7 @@ sub select__info {
 		
 		{			
 			id    => 'Engine',
-			label => "Eludia $Eludia_VERSION ($Eludia_VERSION_NAME)",
+			label => "Eludia $Eludia_VERSION",
 			path  => $preconf -> {core_path},
 		},
 
@@ -1702,6 +1849,13 @@ sub select__info {
 			path  => $INC {$skin . '.pm'},
 		},		
 
+		{			
+			id    => 'JSON module',
+			label => ref ($_JSON) eq 'JSON' ? ('JSON' . ' ' . $JSON::VERSION . ' (backend: ' . JSON->backend . ')', path => $INC {'JSON.pm'})
+				:
+				ref ($_JSON) eq 'JSON::XS' ? ('JSON::XS' . ' ' . $JSON::XS::VERSION, path => $INC {'JSON/XS.pm'})
+				: 'none',
+		},		
 	]	
 
 }
@@ -1870,6 +2024,34 @@ sub del {
 			off     => $data -> {fake} >= 0 || !$_REQUEST {__read_only} || $_REQUEST {__popup},
 		}
 	);
+
+}
+
+################################################################################
+
+sub dt_iso {
+
+	my @ymd = map {split /\D+/} @_;
+	
+	@ymd = reverse @ymd if $ymd [0] < 1000;
+	
+	return sprintf ('%04d-%02d-%02d', @ymd);
+
+}
+
+################################################################################
+
+sub dt_dmy {
+
+	my @dmy = map {split /\D+/} @_;
+	
+	@dmy = reverse @dmy if $dmy [2] < 1000;
+	
+	my $c = substr $i18n -> {_format_d}, 2, 1; 
+	
+	$c ||= '.';
+	
+	return sprintf ("\%02d${c}\%02d${c}\%02d", @dmy);
 
 }
 
@@ -2350,6 +2532,28 @@ sub require_content ($) {
 
 ################################################################################
 
+sub require_config {
+	
+	my ($options) = @_;
+	
+	if ($options -> {no_db}) {
+		$options -> {_db} = $db;
+		$db = undef;
+	}
+	
+	delete $INC {$_PACKAGE . '/Config.pm'};
+	my $module_name = $_PACKAGE . 'Config';
+	delete $INC_FRESH {$module_name};
+	require_fresh ($module_name);
+
+	if ($options -> {no_db}) {
+		$db = $options -> {_db};
+	}
+
+}
+
+################################################################################
+
 sub get_item_of_ ($) {
 	require_content ($_[0]);
 	return call_for_role ('get_item_of_' . $_[0]);
@@ -2406,6 +2610,117 @@ sub prev_next_n {
 	}
 	
 	return ();
+
+}
+
+################################################################################
+
+sub tree_sort {
+
+	my ($list, $options) = @_;
+	
+	my $id        = $options -> {id}        || 'id';
+	my $parent    = $options -> {parent}    || 'parent';
+	my $ord_local = $options -> {ord_local} || 'ord_local';
+	my $ord       = $options -> {ord}       || 'ord';
+	my $level     = $options -> {level}     || 'level';
+
+	my $idx = {};
+	
+	my $len = length ('' . (0 + @$list));
+		
+	my $template = '%0' . $len . 'd';
+	
+	for (my $i = 0; $i < @$list; $i++) {
+	
+		$list -> [$i] -> {$ord_local} = sprintf ($template, $i);
+		
+		$idx -> {$list -> [$i] -> {$id}} = $list -> [$i];
+	
+	}
+
+	foreach my $i (@$list) {
+	
+		my @parents_without_ord = ();
+	
+		$i -> {$ord}   = '';
+		$i -> {$level} = 0;
+	
+		my $j = $i;
+		
+		while ($j) {
+		
+		 	if ($j -> {$ord}) {			
+				$i -> {$ord}    = $j -> {$ord} . $i -> {$ord};
+				$i -> {$level} += $j -> {$level};				
+				last;			
+			}
+		
+			$i -> {$ord} = $j -> {$ord_local} . $i -> {$ord};
+			
+			$i -> {$level} ++;
+			
+			$parents_without_ord [$level] = $j;
+			
+			$j = $idx -> {$j -> {$parent}};
+		
+		}
+		
+		for (my $level = 1; $level < @parents_without_ord; $level ++) {
+		
+			$parents_without_ord [$level] -> {$ord} = substr $i -> {$ord}, 0, $len * ($i -> {$level} - $level);
+		
+		}
+	
+	}
+	
+	return [sort {$a -> {$ord} cmp $b -> {$ord}} @$list];
+
+}
+
+################################################################################
+
+sub fill_in_template {
+
+	return if $_REQUEST {__response_sent};
+
+	my ($template_name, $file_name, $options) = @_;
+	
+	$options -> {no_print} ||= $_REQUEST {no_print};
+
+	$template_name .= '.htm' unless $template_name =~ /\.\w{2,4}$/;
+
+	my $root = $r -> document_root;	
+	my $fn = $root . "/templates/$template_name";
+	
+	my $template = '';
+	open (T, $fn) or die ("Can't open $fn: $!\n");
+	binmode T;
+	while (<T>) {
+		s{\\}{\\\\}g;
+		s{\@([^\{])}{\\\@$1}g;
+		$template .= $_;
+	}
+	close (T);
+
+	my $result = interpolate ($template);
+	
+	$result =~ s{\n}{\r\n}gsm;
+	
+	return $result if ($options -> {no_print});	
+
+	$r -> status (200);
+	
+	unless ($options -> {skip_headers}) {
+		$r -> header_out ('Content-Disposition' => "attachment;filename=$file_name");
+		$r -> send_http_header ('application/octet-stream');
+	}
+	
+	$r -> print ($result);
+
+	$_REQUEST {__response_sent} = 1;
+	
+	return $result;
 
 }
 

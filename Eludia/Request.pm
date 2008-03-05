@@ -24,6 +24,7 @@ sub new {
 	};
 
 	undef @CGI::QUERY_PARAM;
+
 	$self -> {Q} = new CGI;
 
 	$self -> {Filename} = $ENV{PATH_INFO};
@@ -35,6 +36,7 @@ sub new {
 	bless ($self, $class);
 
 	return $self;
+	
 }
 
 ################################################################################
@@ -77,9 +79,12 @@ sub header_in {
 ################################################################################
 
 sub headers_in {
+
 	my $self = shift;
+
 	my $q = $self -> {Q};
 	my @inheaders = $q -> http ($_ [1]);
+
 	shift(@inheaders);
 	foreach $header (@inheaders){
 		@arr=();
@@ -98,11 +103,10 @@ sub headers_in {
 		$ret->{$strout}=$ENV{$header};
 
 	}
-      #	$ret->{'Accept-Encoding'}=$ENV{'HTTP_ACCEPT_ENCODING'};
-      #	$ret->{'Accept-Language'}=$ENV{'HTTP_ACCEPT_LANGUAGE'};
-	return $ret;
-}
 
+	return $ret;
+
+}
 
 ################################################################################
 
@@ -247,7 +251,13 @@ sub parms {
 
 	my $self = shift;
 	my $q = $self -> {Q};
-	my %vars = $q -> Vars;
+	my $params = $self -> {Q} -> Vars;
+	my %vars = ();
+
+	foreach my $k (keys %$params) {
+		($vars {$k}) = grep {$_} split ("\0", $params -> {$k});
+	}
+
 	return \%vars;
 
 }

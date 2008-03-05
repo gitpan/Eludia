@@ -7,7 +7,7 @@ sub vld_date {
 	$name = "_" . $name;
 	
 	if (!$_REQUEST {$name} && $nullable) {
-		delete $_REQUEST {$name};
+		$_REQUEST {$name} = undef;
 		return undef;
 	}
 	
@@ -55,7 +55,10 @@ sub vld_unique {
 	$options -> {value} ||= $_REQUEST {'_' . $options -> {field}};
 	$options -> {id}    ||= $_REQUEST {id};
 	
-	my $id = sql_select_scalar ("SELECT id FROM $table WHERE $$options{field} = ? AND fake = 0 AND id <> ? LIMIT 1", $options -> {value}, $options -> {id});
+	my $filter = "$$options{field} = ? AND fake = 0 AND id <> ?";
+	$filter .= " AND $$options{filter}" if $options -> {filter};
+	
+	my $id = sql_select_scalar ("SELECT id FROM $table WHERE $filter LIMIT 1", $options -> {value}, $options -> {id});
 
 	return $id ? 0 : 1;
 
@@ -317,6 +320,50 @@ sub vld_ogrn {
 	}
 
 	return undef;
+}
+
+################################################################################
+
+sub _vld_checksum {
+
+	my ($number, $coef) = @_;
+	
+	my $sum = 0;
+	
+	for (my $i = 0; $i < length ($number); $i++) {
+	
+		$sum += $coef -> [$i] * substr ($number, $i, 1);
+	
+	}
+	
+	return $sum;
+
+}
+
+################################################################################
+
+sub vld_bank_corr_account {
+
+	my ($bik, $account) = @_;
+	
+	return 0 == (_vld_checksum (
+		'0' . substr ($bik, 4, 2) . $account, 
+		[7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1]
+	) % 10)
+
+}
+
+################################################################################
+
+sub vld_bank_account {
+
+	my ($bik, $account) = @_;
+	
+	return 0 == (_vld_checksum (
+		substr ($bik, -3, 3) . $account, 
+		[7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1, 3, 7, 1]
+	) % 10)
+
 }
 
 1;

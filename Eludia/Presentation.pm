@@ -117,7 +117,7 @@ sub esc_href {
 
 		$href = check_href ({href => $href}, 1);
 
-		return uri_unescape ($href);
+		return uri_unescape ($href) . '&__next_query_string=' . $_REQUEST {__last_query_string};
 		
 	}
 
@@ -201,21 +201,32 @@ sub order {
 	
 	$result ||= $default;
 	
-	if ($_REQUEST {desc}) {
-	
-		$result .= ',';
-		$result =~ s/\s+/ /g;	
-		$result =~ s/ \,/\,/g;	
-		$result =~ s/([^(ASC|DESC)])\,/$1 ASC\,/g;
-		$result =~ s/ DESC\,/ BCSC\,/g;
-		$result =~ s/ ASC\,/ DESC\,/g;
-		$result =~ s/ BCSC\,/ ASC\,/g;
-
-		chop $result;	
-		
+	unless ($_REQUEST {desc}) {
+		$result =~ s{(?<=SC)\!}{}g;
+		return $result;
 	}
-			
-	return $result;
+	
+	
+	my @new = ();
+	
+	foreach my $token (split /\s*\,\s*/gsm, $result) {
+	
+		unless ($token =~ s{\!$}{}) {
+
+			unless ($token =~ s{DESC$}{}i) {
+
+				$token =~ s{ASC$}{}i;
+				$token .= ' DESC';
+
+			}
+
+		}
+	
+		push @new, $token;
+	
+	}
+	
+	return join ', ', @new;
 
 }
 
@@ -307,7 +318,7 @@ sub check_href {
 	}
 	
 	$_REQUEST {__salt}     ||= rand () * time ();
-	$_REQUEST {__uri_root} ||= $_REQUEST {__uri} . '?sid=' . $_REQUEST {sid} . '&salt=' . $_REQUEST {__salt};
+	$_REQUEST {__uri_root} ||= $_REQUEST {__uri} . $_REQUEST {__script_name} . '?sid=' . $_REQUEST {sid} . '&salt=' . $_REQUEST {__salt};
 	
 	my $url = $_REQUEST {__uri_root};
 				
@@ -328,7 +339,17 @@ sub check_href {
 		
 	}
 
-#	$url .= '#';
+	if ($options -> {dialog}) {
+	
+		$url = dialog_open ({
+				
+			title => $options -> {dialog} -> {title},
+				
+			href => $url . '#',
+					
+		}, $options -> {dialog} -> {options}) . $options -> {dialog} -> {after} . ';void (0)',
+		
+	}
 
 	$options -> {href} = $url;
 
@@ -369,6 +390,92 @@ sub draw__info {
 ################################################################################
 
 sub draw__benchmarks {
+	
+	my ($data) = @_;
+
+	return
+
+		draw_table (
+
+			[
+				{label => 'name',  href => {order => 'name'}},
+				{label => 'count', href => {order => 'cnt'}},
+				{label => 'time, ms',  href => {order => 'ms'}},
+				{label => 'mean, ms',  href => {order => 'mean'}},
+				{label => 'total selected',  href => {order => 'selected'}},
+				{label => 'mean selected',  href => {order => 'mean_selected'}},
+			],
+
+			sub {
+
+				draw_cells ({
+				}, [
+					$i -> {label},
+					{
+						label   => $i -> {cnt},
+						picture => '### ### ### ###',
+					},
+					{
+						label   => $i -> {ms},
+						picture => '### ### ### ###',
+					},
+					{
+						label   => $i -> {mean},
+						picture => '### ### ### ###',
+					},
+					{
+						label   => $i -> {selected},
+						picture => '### ### ### ###',
+					},
+					{
+						label   => $i -> {mean_selected},
+						picture => '### ### ### ###',
+					},
+				])
+
+			},
+
+			$data -> {_benchmarks},
+
+			{
+				title => {label => 'Benchmarks'},
+
+				top_toolbar => [{
+							keep_params => ['type', 'select'],
+						},
+					{
+						icon    => 'delete',
+						label   => '&Flush',
+						href    => '?type=_benchmarks&action=flush',
+						target  => 'invisible',
+						confirm => 'Are you sure?',
+					},
+
+					{
+						type        => 'input_text',
+						icon        => 'tv',
+						name        => 'q',
+						keep_params => [],
+					},
+
+					{
+						type    => 'pager',
+						cnt     => 0 + @{$data -> {_benchmarks}},
+						total   => $data -> {cnt},
+						portion => $data -> {portion},
+					},
+
+				],
+				
+			}
+			
+		);
+
+}
+
+################################################################################
+
+sub draw__sql_benchmarks {
 	
 	my ($data) = @_;
 
@@ -504,7 +611,7 @@ EOJS
 
 	return <<EOH
 	
-			<img src="/0.gif" width=100% height=20%>
+			<img src="$_REQUEST{__static_url}/0.gif" width=100% height=20%>
 		
 			<center>
 
@@ -753,7 +860,7 @@ sub draw_auth_toolbar {
 
 	return $_SKIN -> draw_auth_toolbar ({
 		top_banner => ($conf -> {top_banner} ? interpolate ($conf -> {top_banner}) : ''),
-		user_label  => $i18n -> {User} . ': ' . ($_USER -> {label} || $i18n -> {not_logged_in}) . $_REQUEST{__add_user_label},
+		user_label  => $_USER -> {__label} || $i18n -> {User} . ': ' . ($_USER -> {label} || $i18n -> {not_logged_in}) . $_REQUEST{__add_user_label},
 	});
 			
 }
@@ -803,13 +910,38 @@ sub draw_logon_form {
 
 ################################################################################
 
+sub adjust_esc {
+
+	my ($options, $data) = @_;
+	
+	$data ||= $_REQUEST {__page_content};
+
+	if (
+		$_REQUEST {__edit} 
+		&& !$_REQUEST{__from_table} 
+		&& !(ref $data eq HASH && $data -> {fake} > 0)
+	) {
+		$options -> {esc} = create_url (
+			__last_query_string => $_REQUEST {__last_last_query_string},
+			__last_scrollable_table_row => $_REQUEST {__windows_ce} ? undef : $_REQUEST {__last_scrollable_table_row},
+		);
+	}	
+	elsif ($conf -> {core_auto_esc} > 0 && $_REQUEST {__last_query_string}) {
+		$options -> {esc} ||= esc_href ();
+	}
+
+}
+
+################################################################################
+
 sub draw_form {
 
 	my ($options, $data, $fields) = @_;
 	
 	return '' if $options -> {off};
-	
-	$options -> {hr} = $_REQUEST {__tree} ? '' : draw_hr (height => 10);
+
+	$options -> {hr} = defined $options -> {hr} ? $options -> {hr} : 10;
+	$options -> {hr} = $_REQUEST {__tree} ? '' : draw_hr (height => $options -> {hr});
 	
 	if (ref $data eq HASH && $data -> {fake} == -1 && !exists $options -> {no_edit}) {
 		$options -> {no_edit} = 1;
@@ -820,7 +952,8 @@ sub draw_form {
 	$options -> {name}    ||= 'form';
 	
 	!$_REQUEST {__only_form} or $_REQUEST {__only_form} eq $options -> {name} or return '';
-	
+
+	$options -> {no_esc}    = 1 if $apr -> param ('__last_query_string') < 0 && !$_REQUEST {__edit};
 	$options -> {target}  ||= 'invisible';	
 	$options -> {method}  ||= 'post';
 	$options -> {enctype} ||= 'multipart/form-data';
@@ -838,21 +971,8 @@ sub draw_form {
 	push @keep_params, {name  => '__last_scrollable_table_row', value => $_REQUEST {__last_scrollable_table_row} } unless ($_REQUEST {__windows_ce});
 	$options -> {keep_params} = \@keep_params;	
 
-		
-	if (
-		$_REQUEST {__edit} 
-		&& !$_REQUEST{__from_table} 
-		&& !(ref $data eq HASH && $data -> {fake} > 0)
-	) {
-		$options -> {esc} = create_url (
-			__last_query_string => $_REQUEST {__last_last_query_string},
-			__last_scrollable_table_row => $_REQUEST {__windows_ce} ? undef : $_REQUEST {__last_scrollable_table_row},
-		);
-	}	
-	elsif ($conf -> {core_auto_esc} > 0 && $_REQUEST {__last_query_string}) {
-		$options -> {esc} ||= esc_href ();
-	}
-
+	adjust_esc ($options, $data);
+	
 	our $tabindex = 1;
 
 	my @rows = ();
@@ -889,7 +1009,8 @@ sub draw_form {
 			$row -> [$i] -> {form_name} = $options -> {name};
 			$row -> [$i] -> {colspan} ||= 1;
 			$sum_colspan += $row -> [$i] -> {colspan};
-			$sum_colspan ++;
+			$sum_colspan ++ 
+				unless ($row -> [$i] -> {label_off});
 			next if $i < @$row - 1;
 			$row -> [$i] -> {sum_colspan} = $sum_colspan;
 		}
@@ -996,6 +1117,9 @@ sub draw_form_field {
 		elsif ($field -> {type} eq 'checkbox') {
 			$field -> {value} = $data -> {$field -> {name}} || $field -> {checked} ? $i18n -> {yes} : $i18n -> {no};
 		}
+		elsif ($field -> {type} eq 'tree') {
+			$field -> {value} ||= $data -> {$field -> {name}} || [map {$_ -> {id}} grep {$_ -> {is_checkbox} > 1} @{$field -> {values}}];
+		}
 		else {
 			$field -> {value} ||= $data -> {$field -> {name}};
 		}	
@@ -1008,13 +1132,15 @@ sub draw_form_field {
 	
 	if ($_REQUEST {__only_field}) {
 	
+		my @fields = split (',', $_REQUEST {__only_field});
+
 		if ($field -> {type} eq 'hgroup') {
 			my $html = '';
 			foreach (@{$field -> {items}}) {$html .= draw_form_field ($_, $data)}
 			return $html;
 		}
 		else {
-			$_REQUEST {__only_field} eq $field -> {name} or return '';
+			(grep {$_ eq $field -> {name}} @fields) > 0 or return '';
 		}
 
 	}
@@ -1036,7 +1162,7 @@ sub draw_form_field {
 
 	$field -> {label_width} = '20%' unless $field -> {is_slave};	
 
-	return $_SKIN -> draw_form_field ($field);
+	return $_REQUEST {__only_field} ? $_JS_SKIN -> draw_form_field ($field) : $_SKIN -> draw_form_field ($field);
 
 }
 
@@ -1055,6 +1181,18 @@ sub draw_path {
 	$options -> {max_len}  ||= $conf -> {max_len};
 	$options -> {max_len}  ||= 30;
 	$options -> {nowrap}     = $options -> {multiline} ? '' : 'nowrap';
+	
+	if ($_SKIN -> {options} -> {home_esc_forward}) {
+	
+		adjust_esc ($options);
+		
+		if ($_REQUEST {__next_query_string}) {
+		
+			$options -> {forward} = sql_select_scalar ("SELECT href FROM $conf->{systables}->{__access_log} WHERE id_session = ? AND no = ?", $_REQUEST {sid}, $_REQUEST {__next_query_string}) . '&sid=' . $_REQUEST {sid};
+		
+		}
+	
+	}
 	
 	$_REQUEST {__path} = [];
 	
@@ -1111,6 +1249,8 @@ sub draw_form_field_string {
 	$options -> {max_len} ||= $options -> {size};
 	$options -> {max_len} ||= 255;
 	$options -> {attributes} -> {maxlength} = $options -> {max_len};
+	$options -> {attributes} -> {class} ||= $options -> {mandatory} ? 'form-mandatory-inputs' : 'form-active-inputs';	
+
 
 	$options -> {size}    ||= 120;
 	$options -> {attributes} -> {size}      = $options -> {size};
@@ -1175,6 +1315,8 @@ sub draw_form_field_datetime {
 	
 	$options -> {attributes} -> {id} = 'input_' . $options -> {name};
 
+	$options -> {attributes} -> {class} ||= $options -> {mandatory} ? 'form-mandatory-inputs' : 'form-active-inputs';	
+
 	$options -> {attributes} -> {tabindex} = ++ $_REQUEST {__tabindex};
 
 	return $_SKIN -> draw_form_field_datetime (@_);
@@ -1184,9 +1326,14 @@ sub draw_form_field_datetime {
 ################################################################################
 
 sub draw_form_field_file {
+
 	my ($options, $data) = @_;
+
 	$options -> {size} ||= 60;
+	$options -> {attributes} -> {class} ||= $options -> {mandatory} ? 'form-mandatory-inputs' : 'form-active-inputs';	
+
 	return $_SKIN -> draw_form_field_file (@_);
+
 }
 
 ################################################################################
@@ -1220,6 +1367,8 @@ sub draw_form_field_hgroup {
 			
 		}
 		
+		$item -> {mandatory} = exists $item -> {mandatory} ? $item -> {mandatory} : $options -> {mandatory}; 
+		
 		$item -> {type} ||= 'string';
 		
 		$item -> {html}   = &{'draw_form_field_' . $item -> {type}} ($item, $data);
@@ -1241,7 +1390,8 @@ sub draw_form_field_text {
 	$options -> {cols} ||= 60;
 	$options -> {rows} ||= 25;
 
-	$options -> {attributes} -> {class} ||= 'form-active-inputs';	
+	$options -> {attributes} -> {class} ||= $options -> {mandatory} ? 'form-mandatory-inputs' : 'form-active-inputs';	
+	
 	$options -> {attributes} -> {readonly} = 1 if $_REQUEST {__read_only} or $options -> {read_only};	
 	$options -> {attributes} -> {tabindex} = ++ $_REQUEST {__tabindex};
 	
@@ -1257,6 +1407,7 @@ sub draw_form_field_password {
 
 	$options -> {size} ||= $conf -> {size} || 120;	
 	$options -> {attributes} -> {tabindex} = ++ $_REQUEST {__tabindex};
+	$options -> {attributes} -> {class} ||= $options -> {mandatory} ? 'form-mandatory-inputs' : 'form-active-inputs';	
 	
 	return $_SKIN -> draw_form_field_password (@_);
 	
@@ -1282,7 +1433,7 @@ sub draw_form_field_static {
 		delete $options -> {href};
 	}
 	
-	my $value = $options -> {value} || $data -> {$options -> {name}};	
+	my $value = defined $options -> {value} ? $options -> {value} : $data -> {$options -> {name}};
 
 	my $static_value = '';
 	
@@ -1381,7 +1532,7 @@ sub draw_form_field_static {
 			$static_value = $options -> {values} -> {$value};
 		}
 		else {
-			$static_value = $options -> {value} || $value;
+			$static_value = defined $options -> {value} ? $options -> {value} : $value;
 		}
 		
 	}
@@ -1422,57 +1573,83 @@ sub draw_form_field_radio {
 		if (defined $options -> {detail}) {
 
 			ref $options -> {detail} eq ARRAY or $options -> {detail} = [$options -> {detail}];
+			
+
+			my ($codetail_js, $tab_js);
+			my (@all_details, @all_codetails); 
 
 			foreach my $detail_ (@{$options -> {detail}}) {
 
-				my $codetails;
-				if (ref $detail eq HASH) {
+				my ($detail, $codetails);
+				if (ref $detail_ eq HASH) {
 					($detail, $codetails) = each (%{$detail_}); 
 				} else {
 					$detail = $detail_;
 				}
-				my $codetail_js;
 				if (defined $codetails) {
 					ref $codetails eq ARRAY or $codetails = [$codetails];
 					foreach my $codetail (@{$codetails}) {
+						next
+							if ((grep {$_ eq $codetail} @all_codetails) > 0);
+						push (@all_codetails, $codetail);
 						$codetail_js .= <<EOS
 						'&_$codetail=' +
 						document.getElementById('_${codetail}_select').options[document.getElementById('_${codetail}_select').selectedIndex].value +  
 EOS
 					}
+				
 				}
- 
-				my $h = {href => {}};
+	
+				push @all_details, $detail;
+	
+				$tab_js .= <<EOJS;
+					element = this.form.elements['_${detail}'];
+					if (element) {
+						tabs.push (element.tabIndex);
+				}
+EOJS
+			
+			}
 
-				check_href ($h);
+			my $h = {href => {}};
 
-				my $onchange = $_REQUEST {__windows_ce} ? "loadSlaveDiv ('$$h{href}&__only_field=${detail}&__only_form=' + this.form.name + '&_$$options{name}=' + this.options[this.selectedIndex].value);" : <<EOS;
-					activate_link (
+			check_href ($h);
 
-						'$$h{href}&__only_field=${detail}&__only_form=' + 
-						this.form.name + 
-						'&_$$options{name}=' + 
-						this.value + 
-$codetail_js
-						tab
+			my $onchange = $_REQUEST {__windows_ce} ? "loadSlaveDiv ('$$h{href}&__only_form=this.form.name&_$$options{name}=this.value&__only_field=" . (join ',', @all_details) : <<EOJS;
+				activate_link (
+	
+					'$$h{href}&__only_field=${\(join (',', @all_details))}&__only_form=' + 
+					this.form.name + 
+					'&_$$options{name}=' + 
+					this.value + 
+	$codetail_js
+					tab
+	
+					, 'invisible_$$options{name}'
+	
+				);
+EOJS
 
-						, 'invisible_${detail}'
 
-					);
+			push @{$_REQUEST{__invisibles}}, 'invisible_' . $options -> {name};
 
-EOS
+			$value -> {onclick} .= <<EOJS;
+				var element;
+				var tabs = [];
 
-				$value -> {onclick} .= <<EOJS;
+				if (this.options[this.selectedIndex].value && this.options[this.selectedIndex].value != -1) {
 
-					var element = this.form.elements['_${detail}'];
-					
-					var tab = element ? '&__only_tabindex=' + element.tabIndex : '';
-					
-$onchange
+					$tab_js
+					var tab = tabs.length > 0 ? '&__only_tabindex=' + tabs.join (',') : '' 
+				
+					$onchange
+
+				}
 
 EOJS
-	
- 			}
+
+
+			
 		}
 
 		$value -> {type} ||= 'select' if $value -> {values};		
@@ -1485,9 +1662,6 @@ EOJS
 						
 	}
 
-	foreach my $detail (@{$options -> {detail}}) {
-		push @{$_REQUEST{__invisibles}}, 'invisible_' . $detail;
-	}
 
 	return $_SKIN -> draw_form_field_radio (@_);
 	
@@ -1500,7 +1674,7 @@ sub draw_form_field_select {
 	my ($options, $data) = @_;
 	
 	$options -> {max_len} ||= $conf -> {max_len};
-	$options -> {attributes} -> {class} ||= 'form-active-inputs';	
+	$options -> {attributes} -> {class} ||= $options -> {mandatory} ? 'form-mandatory-inputs' : 'form-active-inputs';	
 	$options -> {attributes} -> {tabindex} = ++ $_REQUEST {__tabindex};
 
 	if ($options -> {rows}) {
@@ -1533,63 +1707,166 @@ sub draw_form_field_select {
 
 		ref $options -> {detail} eq ARRAY or $options -> {detail} = [$options -> {detail}];
 
-		foreach my $detail (@{$options -> {detail}}) {
+		my ($codetail_js, $tab_js);
+		my (@all_details, @all_codetails); 
+#warn Dumper \@all_details;
 
-			my $codetails;
-			if (ref $detail eq HASH) {
-				($detail, $codetails) = each (%{$detail}); 
+		foreach my $detail_ (@{$options -> {detail}}) {
+
+			my ($detail, $codetails);
+			if (ref $detail_ eq HASH) {
+				($detail, $codetails) = each (%{$detail_}); 
+			} else {
+				$detail = $detail_;
 			}
-			my $codetail_js;
 			if (defined $codetails) {
 				ref $codetails eq ARRAY or $codetails = [$codetails];
 				foreach my $codetail (@{$codetails}) {
+					next
+						if ((grep {$_ eq $codetail} @all_codetails) > 0);
+					push (@all_codetails, $codetail);
 					$codetail_js .= <<EOS
-						'&_$codetail=' +
-						document.getElementById('_${codetail}_select').options[document.getElementById('_${codetail}_select').selectedIndex].value +  
+					'&_$codetail=' +
+					document.getElementById('_${codetail}_select').options[document.getElementById('_${codetail}_select').selectedIndex].value +  
 EOS
 				}
+				
 			}
- 
-			my $h = {href => {}};
 
-			check_href ($h);
+			push @all_details, $detail;
+			$tab_js .= <<EOJS;
+				element = this.form.elements['_${detail}'];
+				if (element) {
+					tabs.push (element.tabIndex);
+				}
+EOJS
+			
+		}
 
-			push @{$_REQUEST{__invisibles}}, 'invisible_' . $detail;
+		my $h = {href => {}};
 
-			my $onchange = $_REQUEST {__windows_ce} ? "loadSlaveDiv ('$$h{href}&__only_field=${detail}&__only_form=' + this.form.name + '&_$$options{name}=' + this.options[this.selectedIndex].value);" : <<EOS;
-					activate_link (
+		check_href ($h);
 
-						'$$h{href}&__only_field=${detail}&__only_form=' + 
-						this.form.name + 
-						'&_$$options{name}=' + 
-						this.options[this.selectedIndex].value + 
+#warn Dumper \@all_details;
+		my $onchange = $_REQUEST {__windows_ce} ? "loadSlaveDiv ('$$h{href}&__only_form=this.form.name&_$$options{name}=this.value&__only_field=" . (join ',', @all_details) : <<EOJS;
+			activate_link (
+
+				'$$h{href}&__only_field=${\(join (',', @all_details))}&__only_form=' + 
+				this.form.name + 
+				'&_$$options{name}=' + 
+				this.value + 
 $codetail_js
-						tab
+				tab
 
-						, 'invisible_${detail}'
+				, 'invisible_$$options{name}'
 
-					);
+			);
+EOJS
 
-EOS
 
-			$options -> {onChange} .= <<EOJS;
+		push @{$_REQUEST{__invisibles}}, 'invisible_' . $options -> {name};
+
+		$options -> {onChange} .= <<EOJS;
+				var element;
+				var tabs = [];
 
 				if (this.options[this.selectedIndex].value && this.options[this.selectedIndex].value != -1) {
 
-					var element = this.form.elements['_${detail}'];
-					
-					var tab = element ? '&__only_tabindex=' + element.tabIndex : '';
-					
-$onchange
+					$tab_js
+					var tab = tabs.length > 0 ? '&__only_tabindex=' + tabs.join (',') : '' 
+				
+					$onchange
 
 				}
 
 EOJS
 	
- 		}
 	}
 
 	return $_SKIN -> draw_form_field_select (@_);
+	
+}
+
+################################################################################
+
+sub draw_form_field_string_voc {
+
+	my ($options, $data) = @_;
+	
+	$options -> {max_len} ||= $conf -> {max_len};
+	$options -> {attributes} -> {class} ||= $options -> {mandatory} ? 'form-mandatory-inputs' : 'form-active-inputs';	
+	$options -> {attributes} -> {tabindex} = ++ $_REQUEST {__tabindex};
+	$options -> {size}    ||= 50;
+	$options -> {attributes} -> {size}      = $options -> {size};
+
+	foreach my $value (@{$options -> {values}}) {
+
+		if (($value -> {id} eq $data -> {$options -> {name}}) or ($value -> {id} eq $options -> {value})) {
+			$options -> {attributes} -> {value} = trunc_string ($value -> {label}, $options -> {max_len});
+			$value -> {id} =~ s{\"}{\&quot;}g; #";
+			$options -> {id} = $value -> {id};
+			last; 
+		}
+
+	}
+
+	if (defined $options -> {other}) {
+
+		ref $options -> {other} or $options -> {other} = {href => $options -> {other}};
+
+		check_href ($options -> {other});
+
+		$options -> {other} -> {param} ||= 'q';
+		$options -> {other} -> {href} =~ s{([\&\?])select\=\w+}{$1};
+		$options -> {other} -> {href} =~ s{([\&\?])__tree\=\w+}{$1};
+
+	}		
+
+	
+	$options -> {attributes} -> {name}  = '_' . $options -> {name} . '_label';
+
+	return $_SKIN -> draw_form_field_string_voc (@_);
+	
+}
+
+################################################################################
+
+sub draw_form_field_tree {
+
+	my ($options, $data) = @_;
+	
+	return '' if $options -> {off};
+	
+	my $v = $options -> {value} || $data -> {$options -> {name}};
+
+	foreach my $value (@{$options -> {values}}) {
+		my $checked = 0 + (grep {$_ eq $value -> {id}} @$v);
+		
+		if ($value -> {href}) {
+	
+			my $__last_query_string = $_REQUEST {__last_query_string};
+			$_REQUEST {__last_query_string} = $options -> {no_no_esc} ? $__last_query_string : -1;
+			check_href ($options);
+			$options -> {href} .= '&__tree=1' unless ($options -> {no_tree});
+			$_REQUEST {__last_query_string} = $__last_query_string;
+	
+		}
+		
+		$value -> {__node} = draw_node ({
+			label	=> $value -> {label},
+			id	=> $value -> {id},
+			parent	=> $value -> {parent},
+			is_checkbox	=> $value -> {is_checkbox} + $checked,
+			icon    	=> $value -> {icon},
+			iconOpen    	=> $value -> {iconOpen},
+			href  		=> $value -> {href},
+		})
+
+	}
+
+
+
+	return $_SKIN -> draw_form_field_tree ($options, $data);
 	
 }
 
@@ -1784,7 +2061,7 @@ sub draw_toolbar {
 		if (ref $button eq HASH) {
 			next if $button -> {off};
 			$button -> {type} ||= 'button';
-			$button -> {html} = &{'draw_toolbar_' . $button -> {type}} ($button);
+			$button -> {html} = &{'draw_toolbar_' . $button -> {type}} ($button, $options -> {_list});
 		}
 		else {
 			$button = {html => $button, type => 'input_raw'};
@@ -1841,7 +2118,7 @@ sub draw_toolbar_button {
 		my $salt = rand;
 		my $msg = js_escape ($options -> {confirm});
 		$options -> {href} =~ s{\%}{\%25}gsm; 		# wrong, but MSIE uri_unescapes the 1st arg of window.open :-(
-		$options -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$options{href}', '$$options{target}')}];
+		$options -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$options{href}', '$$options{target}')} else {document.body.style.cursor = 'default'; nop ();}];
 	} 
 	
 	if ($options -> {href} =~ /^java/) {
@@ -1990,9 +2267,11 @@ sub draw_toolbar_input_date {
 
 sub draw_toolbar_pager {
 
-	my ($options) = @_;
+	my ($options, $list) = @_;
 	
-	$options -> {portion} ||= $conf -> {portion};
+	$options -> {portion} ||= $_REQUEST {__page_content} -> {portion} || $conf -> {portion};
+	$options -> {total}   ||= $_REQUEST {__page_content} -> {cnt};
+	$options -> {cnt}     ||= 0 + @$list;
 
 	$options -> {start} = $_REQUEST {start} + 0;
 
@@ -2084,7 +2363,7 @@ sub draw_centered_toolbar_button {
 		$options -> {preconfirm} ||= 1;
 		$options -> {href} =~ s{\%}{\%25}gsm; 		# wrong, but MSIE uri_unescapes the 1st arg of window.open :-(
 		my $href = js_escape ($options -> {href});
-		$options -> {href} = qq [javascript:if (!($$options{preconfirm}) || ($$options{preconfirm} && confirm ($msg))) {nope($href, '$target')} else {window.parent.document.body.style.cursor = 'normal'; nop ();} ];
+		$options -> {href} = qq [javascript:if (!($$options{preconfirm}) || ($$options{preconfirm} && confirm ($msg))) {nope($href, '$target')} else {document.body.style.cursor = 'default'; nop ();} ];
 	} 	
 
 	if ($options -> {href} =~ /^java/) {
@@ -2309,10 +2588,10 @@ sub draw_menu {
 		register_hotkey ($type, 'href', 'main_menu_' . $type -> {name}, $conf -> {kb_options_menu});
 		
 		if ($_REQUEST {__edit} && !$type -> {no_off}) {
-			$type -> {href} = "javaScript:alert('$$i18n{save_or_cancel}'); document.body.style.cursor = 'normal'; nop ();";
+			$type -> {href} = "javaScript:alert('$$i18n{save_or_cancel}'); document.body.style.cursor = 'default'; nop ();";
 		}
 		elsif ($type -> {no_page}) {
-			$type -> {href} = "javaScript:document.body.style.cursor = 'normal'; nop ()";
+			$type -> {href} = "javaScript:document.body.style.cursor = 'default'; nop ()";
 		} 
 		else {
 			$type -> {href} ||= "/?type=$$type{name}";
@@ -2407,17 +2686,46 @@ sub draw_cells {
 		$i -> {__target} ||= $options -> {target};
 	}
 	
-	foreach my $cell (order_cells (@{$_[0]})) {
+	$options -> {__fixed_cols} = 0;
+	
+	my @cells = order_cells (@{$_[0]});
+	if ($_REQUEST {select}) {
+		my @cell;
+
+		if ((@cell = grep {$_ -> {select_href}} @cells) == 0) {
+
+			foreach my $cell (@cells) {
+				if (!$cell -> {no_select_href} && $cell -> {label}) {
+					$options -> {select_label} = $cell -> {label};
+					last;
+				} 
+			}
+
+		} else {
+			$options -> {select_label} = $cell [0] -> {label};
+		}
+	}
+	
+	foreach my $cell (@cells) {
 	
 		if ($options -> {href}) {
+
 			ref $cell or $cell = {label => $cell};
+
 			$cell -> {a_class} ||= $options -> {a_class};
 			$cell -> {target}  ||= $options -> {target} || '_self';
-			unless ($cell -> {href}) {
+
+			unless (exists $cell -> {href}) {
 				$cell -> {href} = $options -> {href};
 				$cell -> {no_check_href} = 1;
 			}
+
+			if ($options -> {dialog} && !$cell -> {dialog}) {
+				$cell -> {dialog} = $options -> {dialog};
+			}
 		}
+		
+		$options -> {__fixed_cols} ++ if ref $cell eq HASH && $cell -> {no_scroll};		
 		
 		$result .= 
 			!ref ($cell) || ($cell -> {type} ne 'button' && !$cell -> {icon} && $cell -> {off}) || $cell -> {read_only} ? draw_text_cell ($cell, $options) :
@@ -2428,6 +2736,7 @@ sub draw_cells {
 			$cell  -> {type} eq 'textarea' ? draw_textarea_cell  ($cell, $options) :
 			$cell  -> {type} eq 'select'   ? draw_select_cell ($cell, $options) :
 			$cell  -> {type} eq 'embed'    ? draw_embed_cell ($cell, $options) :
+			$cell  -> {type} eq 'string_voc' ? draw_string_voc_cell ($cell, $options) :			
 			draw_text_cell ($cell, $options);
 	
 	}
@@ -2509,8 +2818,8 @@ sub draw_text_cell {
 
 		check_title ($data);	
 		
-		if ($_REQUEST {select} && !$options -> {no_select_href} && !$data -> {no_select_href}) {
-			$data -> {href}   = js_set_select_option ('', {id => $i -> {id}, label => $data -> {label}});
+		if ($_REQUEST {select}) {
+			$data -> {href}   = js_set_select_option ('', {id => $i -> {id}, label => $options -> {select_label}});
 		}
 #		else {
 #			$data -> {href}   ||= $options -> {href} unless $options -> {is_total};
@@ -2524,6 +2833,18 @@ sub draw_text_cell {
 		else {
 			delete $data -> {href};
 		}
+		
+#		if ($data -> {dialog}) {
+#		
+#			$data -> {href} = dialog_open ({
+#					
+#				title => $data -> {dialog} -> {title},
+#					
+#				href => $data -> {href},
+#						
+#			}, $data -> {dialog} -> {options}) . $data -> {dialog} -> {after} . ';void (0)',
+#			
+#		}
 
 		if ($data -> {add_hidden}) {
 			$data -> {hidden_name}  ||= $data -> {name};
@@ -2609,6 +2930,44 @@ sub draw_select_cell {
 
 ################################################################################
 
+sub draw_string_voc_cell {
+
+	my ($data, $options) = @_;
+
+	$data -> {value} ||= $i -> {$data -> {name}};
+	return draw_text_cell ($data, $options) if ($_REQUEST {__read_only} && !$data -> {edit}) || $data -> {read_only} || $data -> {off};
+	
+	$data -> {max_len} ||= $conf -> {max_len};
+
+	_adjust_row_cell_style ($data, $options);
+
+	
+	foreach my $value (@{$data -> {values}}) {
+		if (($value -> {id} eq $i -> {$data -> {name}}) or ($value -> {id} eq $data -> {value})) {			
+ 			$data -> {id} = $value -> {id};
+			$data -> {label} = $value -> {label}; 
+			$data -> {label} =~ s/\"/\&quot\;/gsm; #";			
+			last;
+		}
+	}
+	
+	if (defined $data -> {other}) {
+
+		ref $data -> {other} or $data -> {other} = {href => $data -> {other}};
+		check_href ($data -> {other});
+
+		$data -> {other} -> {param} ||= 'q';
+		$data -> {other} -> {button} ||= '...';
+		$data -> {other} -> {href} =~ s{([\&\?])select\=\w+}{$1};
+		$data -> {other} -> {href} =~ s{([\&\?])__tree\=\w+}{$1};		
+	}		
+	
+	return $_SKIN -> draw_string_voc_cell ($data, $options);
+	
+}
+
+################################################################################
+
 sub draw_input_cell {
 
 	my ($data, $options) = @_;
@@ -2616,9 +2975,6 @@ sub draw_input_cell {
 	return draw_text_cell ($data, $options) if ($_REQUEST {__read_only} && !$data -> {edit}) || $data -> {read_only} || $data -> {off};
 
 	$data -> {size} ||= 30;
-
-	$data -> {attributes} ||= {};
-	$data -> {attributes} -> {class} ||= 'row-cell';
 	
 	_adjust_row_cell_style ($data, $options);
 						
@@ -2686,7 +3042,7 @@ sub draw_row_button {
 		my $salt = rand;
 		my $msg = js_escape ($options -> {confirm});
 		$options -> {href} =~ s{\%}{\%25}gsm; 		# wrong, but MSIE uri_unescapes the 1st arg of window.open :-(
-		$options -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$options{href}', '_self')} else {document.body.style.cursor = 'normal'; nop ();}];
+		$options -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$options{href}', '_self')} else {document.body.style.cursor = 'default'; nop ();}];
 	}
 
 	if (
@@ -2784,7 +3140,20 @@ sub draw_table_header_cell {
 
 	check_title ($cell);
 	
-	foreach my $field (qw(href href_asc href_desc)) {
+	if ($cell -> {order}) {
+	
+		$cell -> {href} = {
+			order                    => $cell -> {order}, 
+			__last_last_query_string => $_REQUEST {__last_last_query_string},
+		};
+		
+		$cell -> {href} -> {desc} = $_REQUEST {order} eq $cell -> {order} ? 1 - $_REQUEST {desc} : 0;
+
+	}
+
+	check_href ($cell) if $cell -> {href};	
+	
+	foreach my $field (qw(href_asc href_desc)) {
 	
 		$cell -> {$field} or next;
 		
@@ -2866,6 +3235,7 @@ sub draw_table {
 	
 	$options -> {action} ||= 'add';
 	$options -> {name}   ||= 'form';
+	$options -> {target} ||= 'invisible';
 	$options -> {header}   = draw_table_header ($headers) if @$headers > 0;
 
 	return '' if $options -> {off};		
@@ -2884,12 +3254,14 @@ sub draw_table {
 				draw_window_title ($options -> {title}) if $options -> {title} -> {label};
 		}
 		else {
-			$options -> {title} = '';
+			$options -> {title} = draw_window_title ($options -> {title}) 
+				if $options -> {title} -> {label};
 		}
 		
 	}
 	
-	if (ref $options -> {top_toolbar} eq ARRAY) {			
+	if (ref $options -> {top_toolbar} eq ARRAY) {
+		$options -> {top_toolbar} -> [0] -> {_list} = $list;		
 		$options -> {top_toolbar} = draw_toolbar (@{ $options -> {top_toolbar} });
 	}
 	
@@ -2992,9 +3364,14 @@ sub draw_node {
 	
 	my $result = '';
 	
-	$options -> {href} .= '&__tree=1' unless ($options -> {no_tree});		
 	if ($options -> {href}) {
-		check_href ($options) ;
+
+		my $__last_query_string = $_REQUEST {__last_query_string};
+		$_REQUEST {__last_query_string} = $options -> {no_no_esc} ? $__last_query_string : -1;
+		check_href ($options);
+		$options -> {href} .= '&__tree=1' unless ($options -> {no_tree});
+		$_REQUEST {__last_query_string} = $__last_query_string;
+
 	}
 	
 	$options -> {parent} = -1 if ($options -> {parent} == 0);
@@ -3014,7 +3391,7 @@ sub draw_node {
 			my $salt = rand;
 			my $msg = js_escape ($button -> {confirm});
 			$button -> {href} =~ s{\%}{\%25}gsm; 		# wrong, but MSIE uri_unescapes the 1st arg of window.open :-(
-			$button -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$button{href}', '$$button{target}')} else {document.body.style.cursor = 'normal'; nop ();}];
+			$button -> {href} = qq [javascript:if (confirm ($msg)) {nope('$$button{href}', '$$button{target}')} else {document.body.style.cursor = 'default'; nop ();}];
 		}
 
 		check_title ($button, $i);
@@ -3025,8 +3402,6 @@ sub draw_node {
 
 	$i -> {__menu} = draw_vert_menu ($i, \@buttons) 
 		if ((grep {$_ ne BREAK} @buttons) > 0);
-#	warn $options -> {__menu};
-#	warn "draw_node: " . Dumper ($options);
 		
 	return 	$_SKIN -> draw_node ($options, $i);
 	
@@ -3140,6 +3515,8 @@ sub draw_page {
 		
 		eval { $page -> {content} = call_for_role ($selector)} unless $_REQUEST {__only_menu};
 		
+		$_REQUEST {__page_content} = $page -> {content};
+		
 		warn $@ if $@;
 		
 		setup_skin ();
@@ -3205,8 +3582,17 @@ sub draw_page {
 		$html = $_SKIN -> draw_error_page ($page);		
 
 	}
+	
+	if ($_REQUEST {__only_field}) {
 
-	$html ||= $_SKIN -> draw_page ($page);
+		$html ||= $_JS_SKIN -> draw_page ($page);
+		
+	} else {
+	
+		$html ||= $_SKIN -> draw_page ($page);
+	
+	}
+
 
 	if (
 		   $conf -> {core_screenshot} -> {allow}
@@ -3282,6 +3668,42 @@ warn "\$href='$href'(2)\n";
 
 	$_SKIN -> lrt_finish ($banner, $href);
 	
+}
+
+################################################################################
+
+sub dialog_close {
+
+	my ($result) = @_;
+	
+	$result ||= {};
+	
+	setup_skin ();
+	
+	$_SKIN -> dialog_close ($result);
+	
+	$_REQUEST {__response_sent} = 1;
+
+}
+
+################################################################################
+
+sub dialog_open {
+
+	my ($arg, $options) = @_;
+	
+	$options -> {dialogHeight} ||= $options -> {height} . 'px' if $options -> {height};
+	$options -> {dialogWidth}  ||= $options -> {width}  . 'px' if $options -> {width};
+
+	$arg ||= {};
+	
+	my $id = 0 + $arg;
+	check_href ($arg);
+
+	$_REQUEST {__script} .= json_dump_to_function ("dialog_open_$id" => $arg);
+
+	return $_SKIN -> dialog_open ($arg, $options);
+
 }
 
 1;

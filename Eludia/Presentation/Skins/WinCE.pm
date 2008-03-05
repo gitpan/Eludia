@@ -158,6 +158,9 @@ sub draw_window_title {
 
 	my ($_SKIN, $options) = @_;
 
+	return ''
+		if $_REQUEST {select};
+
 	return <<EOH
 		<table cellspacing=0 cellpadding=0 width="100%"><tr><td class='header15'><img src="/i/0.gif" width=1 align=absmiddle>&nbsp;&nbsp;&nbsp;$$options{label}</table>
 EOH
@@ -1788,7 +1791,7 @@ EOJ
 	$html .= <<EOH;
 		history.go (-1); 
 		alert ($message);
-		window.parent.document.body.style.cursor = 'normal';
+		window.parent.document.body.style.cursor = 'default';
 	">
 				</body>
 			</html>				
