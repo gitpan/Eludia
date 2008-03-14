@@ -773,7 +773,7 @@ sub draw_form_field_select {
 					var dialog_width = $options->{other}->{width};
 					var dialog_height = $options->{other}->{height};
 
-					var result = window.showModalDialog ('$_REQUEST{__static_url}/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&select=$options->{name}'}, 'status:no;resizable:yes;help:no;dialogWidth:' + dialog_width + 'px;dialogHeight:' + dialog_height + 'px');
+					var result = window.showModalDialog ('$ENV{SCRIPT_URI}/i/_skins/TurboMilk/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&select=$options->{name}'}, 'status:no;resizable:yes;help:no;dialogWidth:' + dialog_width + 'px;dialogHeight:' + dialog_height + 'px');
 					
 					focus ();
 					
@@ -796,7 +796,7 @@ EOJS
 						var dialog_width = $options->{other}->{width};
 						var dialog_height = $options->{other}->{height};
 
-						var result = window.showModalDialog ('$_REQUEST{__static_url}/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&select=$options->{name}'}, 'status:no;resizable:yes;help:no;dialogWidth:' + dialog_width + 'px;dialogHeight:' + dialog_height + 'px');
+						var result = window.showModalDialog ('$ENV{SCRIPT_URI}/i/_skins/TurboMilk/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&select=$options->{name}'}, 'status:no;resizable:yes;help:no;dialogWidth:' + dialog_width + 'px;dialogHeight:' + dialog_height + 'px');
 						
 						focus ();
 						
@@ -881,7 +881,7 @@ sub draw_form_field_string_voc {
 
 			var q = encode1251(document.getElementById('${options}_label').value);
 
-			var result = window.showModalDialog ('$_REQUEST{__static_url}/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&$options->{other}->{param}=' + q + '&select=$options->{name}&$options->{other}->{cgi_tail}'}, 'status:no;resizable:yes;help:no;dialogWidth:' + dialog_width + 'px;dialogHeight:' + dialog_height + 'px');
+			var result = window.showModalDialog ('$ENV{SCRIPT_URI}/i/_skins/TurboMilk/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&$options->{other}->{param}=' + q + '&select=$options->{name}&$options->{other}->{cgi_tail}'}, 'status:no;resizable:yes;help:no;dialogWidth:' + dialog_width + 'px;dialogHeight:' + dialog_height + 'px');
 			
 			focus ();
 			
@@ -1336,7 +1336,7 @@ sub draw_toolbar_input_select {
 
 				if (this.options[this.selectedIndex].value == -1) {
 
-					var result = window.showModalDialog ('$_REQUEST{__static_url}/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&select=$name'}, 'status:no;resizable:yes;help:no;dialogWidth:$options->{other}->{width}px;dialogHeight:$options->{other}->{height}px');
+					var result = window.showModalDialog ('$ENV{SCRIPT_URI}/i/_skins/TurboMilk/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&select=$name'}, 'status:no;resizable:yes;help:no;dialogWidth:$options->{other}->{width}px;dialogHeight:$options->{other}->{height}px');
 					
 					focus ();
 					
@@ -1359,7 +1359,7 @@ EOJS
 
 					if (window.confirm ('$$i18n{confirm_open_vocabulary}')) {
 
-						var result = window.showModalDialog ('$_REQUEST{__static_url}/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&select=$name'}, 'status:no;resizable:yes;help:no;dialogWidth:$options->{other}->{width}px;dialogHeight:$options->{other}->{height}px');
+						var result = window.showModalDialog ('$ENV{SCRIPT_URI}/i/_skins/TurboMilk/dialog.html?@{[rand ()]}', {href: '$options->{other}->{href}&select=$name'}, 'status:no;resizable:yes;help:no;dialogWidth:$options->{other}->{width}px;dialogHeight:$options->{other}->{height}px');
 						
 						focus ();
 						
@@ -1867,6 +1867,7 @@ sub draw_text_cell {
 		
 		$html .= '</nobr>' unless $data -> {no_nobr};
 		
+		$html .= qq {<input type=hidden name="$$data{hidden_name}" value="$$data{hidden_value}">} if ($data -> {add_hidden});
 		
 	} else {
 		$html .= '&nbsp;';
@@ -1956,7 +1957,7 @@ sub draw_string_voc_cell {
 			
 			var q = encode1251(document.getElementById('$$data{name}_label').value);
 			
-			var result = window.showModalDialog ('$_REQUEST{__static_url}/dialog.html?@{[rand ()]}', {href: '$data->{other}->{href}&$data->{other}->{param}=' + q + '&select=$data->{name}'}, 'status:no;resizable:yes;help:no;dialogWidth:' + dialog_width + 'px;dialogHeight:' + dialog_height + 'px');
+			var result = window.showModalDialog ('$ENV{SCRIPT_URI}/i/_skins/TurboMilk/dialog.html?@{[rand ()]}', {href: '$data->{other}->{href}&$data->{other}->{param}=' + q + '&select=$data->{name}'}, 'status:no;resizable:yes;help:no;dialogWidth:' + dialog_width + 'px;dialogHeight:' + dialog_height + 'px');
 			
 			focus ();
 			
@@ -2262,10 +2263,20 @@ EOH
 		delete $h {salt};
 		delete $h {_salt};
 		
+		my $url_dump = create_url (__dump => 1);
+
 		my $href = create_url (%h);
 
 		$_REQUEST {__on_load} .= "check_top_window ();";
-				
+
+		$preconf -> {core_show_dump} and $_REQUEST {__on_mousedown} .= <<EODUMP;
+
+		    if (window.event.button == 2 && window.event.ctrlKey) {
+    			nope ('$url_dump', '_blank', 'toolbar=no,resizable=yes,scrollbars=yes');
+		    }
+		    
+EODUMP
+
 		$_REQUEST {__on_keydown} = <<EOJS;
 		
 //			if (code_alt_ctrl (88, 1, 0)) {
@@ -3003,7 +3014,7 @@ sub dialog_open {
 	$options -> {dialogHeight} ||= '150px';
 	$options -> {dialogWidth}  ||= '600px';
 	
-	my $url = $_REQUEST {__static_url} . '/dialog.html?' . rand ();
+	my $url = $ENV{SCRIPT_URI} . '/i/_skins/TurboMilk/dialog.html?' . rand ();
 	my $o = join ';', map {"$_:$options->{$_}"} keys %$options;
 	
 	return "javaScript:var result=window.showModalDialog('$url', dialog_open_$id (), '$o');document.body.style.cursor='default';void(0);";

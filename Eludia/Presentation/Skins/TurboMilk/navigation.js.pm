@@ -168,7 +168,7 @@ function idx_tables (__scrollable_table_row) {
 	scrollable_table_row_cell = 0;
 
 	if (scrollable_rows.length > 0) {
-		if (scrollable_table_row > 0) scrollCellToVisibleTop (cell_on ());
+		if (scrollable_table_row > 0) scrollCellToVisibleTop (cell_on (), 1);
 	}
 	else {
 		scrollable_table = null;
@@ -555,8 +555,8 @@ function open_popup_menu (type, level) {
 		hideSubMenus (level);
 	}
 
-	div.style.top  = event.y - 5 + document.body.scrollTop;
-	div.style.left = event.x - 5 + document.body.scrollLeft;
+	div.style.top  = event.clientY - 5 + document.body.scrollTop;
+	div.style.left = event.clientX - 5 + document.body.scrollLeft;
 	
 
 	last_vert_menu [level] = {
@@ -653,10 +653,13 @@ function focus_on_first_input (td) {
 }
 
 function blockEvent () {
-	window.event.keyCode = 0;	
-	window.event.cancelBubble = true;
-	window.event.returnValue = false;
+
+	try { window.event.keyCode = 0         } catch (e) {}
+	try { window.event.cancelBubble = true } catch (e) {}
+	try { window.event.returnValue = false } catch (e) {}
+
 	return false;
+	
 }
 
 function absTop (element) {
@@ -672,9 +675,9 @@ function absTop (element) {
 
 }
 
-function scrollCellToVisibleTop (td) {
+function scrollCellToVisibleTop (td, force_top) {
 	
-	var table = td.parentElement.parentElement.parentElement.parentElement;
+	var table = td.parentElement.parentElement.parentElement;
 	var thead = table.tHead;
 	var div   = table.parentElement;
 
@@ -682,7 +685,16 @@ function scrollCellToVisibleTop (td) {
 	if (thead) delta += thead.offsetHeight;
 	if (delta > 0) div.scrollTop -= delta;
 
-	var delta = td.offsetTop + td.offsetHeight - div.offsetHeight - div.scrollTop;
+	var delta = td.offsetTop - div.scrollTop;
+	
+	if (force_top) {
+		if (thead) delta -= thead.offsetHeight;
+	}
+	else {
+		delta -= div.offsetHeight;
+		delta += td.offsetHeight;
+	}
+	
 	if (div.scrollWidth > div.offsetWidth - 12) delta += 12;
 	if (delta > 0) div.scrollTop += delta;
 

@@ -44,13 +44,13 @@ BEGIN {
   
 	$Data::Dumper::Sortkeys = 1;
 	
-	'$LastChangedDate: 2008-03-05 10:49:35 +0300 (Ср, 05 мар 2008) $' =~ /(\d\d)(\d\d)\-(\d\d)\-(\d\d)/;
+	'$LastChangedDate: 2008-03-14 18:49:32 +0300 (Пт, 14 мар 2008) $' =~ /(\d\d)(\d\d)\-(\d\d)\-(\d\d)/;
 	
 	my $year = "$1$2";
 
 	$Eludia::VERSION      = "$2.$3.$4";
 
-	'$LastChangedRevision: 1107 $' =~ /(\d+)/;
+	'$LastChangedRevision: 1215 $' =~ /(\d+)/;
 	
 	$Eludia::VERSION     .= ".$1";
 
@@ -347,3 +347,5 @@ Dmitry Ovsyanko, <'do_' -- like this, with a trailing underscore -- at 'pochta.r
 Pavel Kudryavtzev
 
 Roman Lobzin
+
+Vadim Stepanov

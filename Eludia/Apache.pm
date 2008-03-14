@@ -5,16 +5,15 @@ no warnings;
 sub get_request {
 
 	my $http_host = $ENV {HTTP_X_FORWARDED_HOST} || $self -> {preconf} -> {http_host};
-	if ($http_host) {
-		$ENV {HTTP_HOST} = $ENV {HTTP_X_FORWARDED_HOST};
-	}
+	
+	$ENV {HTTP_HOST} = $http_host if $http_host;
 
 	if ($connection) {
 		our $r   = new Eludia::InternalRequest ($connection, $request);
 		our $apr = $r;
 		return;
 	}
-	elsif ($ENV {SERVER_SOFTWARE} =~ /IIS/) {
+	elsif ($ENV {SERVER_SOFTWARE} =~ /IIS/ || $ENV {SERVER_SOFTWARE} =~ /^lighttpd/) {
 	        our $r = new Eludia::Request ($preconf, $conf);
 		our $apr = $r;
 	}
@@ -38,7 +37,6 @@ sub get_request {
 		require CGI::Cookie;
 		our %_COOKIES = CGI::Cookie -> fetch;
 	}
-	
 
 }
 
@@ -200,6 +198,8 @@ sub check_static_files {
 
 sub handler {
 
+	my $handler_time = time ();
+
 	$ENV {REMOTE_ADDR} = $ENV {HTTP_X_REAL_IP} if $ENV {HTTP_X_REAL_IP};
 
 	$_PACKAGE ||= __PACKAGE__ . '::';
@@ -207,7 +207,11 @@ sub handler {
 	get_request (@_);
 
 	my $time = $r -> request_time ();
+
+	$time = __log_profilinig ($handler_time, '<get_request>');
+
 	my $first_time = $time;
+
 	$_REQUEST {__sql_time} = 0;
 
 	my $parms = ref $apr eq 'Apache2::Request' ? $apr -> param : $apr -> parms;
@@ -261,11 +265,15 @@ sub handler {
 	}
 
 	my $request_time = 1000 * (time - $first_time);
-	
-	$time = __log_profilinig ($time, '<REQUEST>');
-	
+		
 	require_config ({no_db => 1});
+	
+	$time = __log_profilinig ($time, '<require_config no_db>');
+
    	sql_reconnect ();   	
+
+	$time = __log_profilinig ($time, '<sql_reconnect>');
+
 	require_config ();
 
 	__log_request_profilinig ($request_time);
@@ -496,11 +504,11 @@ EOH
 
 			undef $__last_insert_id;
 
-			eval { $db -> {AutoCommit} = 0; };
-
 			our %_OLD_REQUEST = %_REQUEST;
 
 			log_action_start ();
+
+			eval { $db -> {AutoCommit} = 0; };
 
 			my $sub_name = "validate_${action}_$$page{type}";
 
@@ -580,7 +588,11 @@ EOH
 			}
 
 			eval {
-				$db -> commit unless $_REQUEST {error} || $db -> {AutoCommit};
+				if ($_REQUEST {error}) {
+					$db -> rollback
+				} else {
+					$db -> commit
+				} 
 				$db -> {AutoCommit} = 1;
 			};
 
@@ -632,7 +644,7 @@ EOH
 			}
 
 			$r -> headers_out -> {'Expires'} = '-1';
-
+			
 			out_html ({}, draw_page ($page));
 
 		}

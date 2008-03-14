@@ -426,12 +426,17 @@ sub sql_is_temporal_table {
 
 sub sql_reconnect {
 
+my $time = time;
+
 	if ($db && $model_update && $model_update -> {core_ok}) {
 		my $ping = $db -> ping;
+$time = __log_profilinig ($time, '  sql_reconnect: ping');
 		return if $ping;
 	}
 	
 	check_systables ();
+
+$time = __log_profilinig ($time, '  sql_reconnect: check_systables');
 
 	our $db = DBI -> connect ($preconf -> {'db_dsn'}, $preconf -> {'db_user'}, $preconf -> {'db_password'}, {
 		RaiseError  => 1, 
@@ -440,6 +445,8 @@ sub sql_reconnect {
 		LongTruncOk => 1,
 		InactiveDestroy => 0,
 	});
+
+$time = __log_profilinig ($time, '  sql_reconnect: connect');
 
 	my $driver_name = $db -> get_info ($GetInfoType {SQL_DBMS_NAME});
 	
@@ -453,6 +460,8 @@ sub sql_reconnect {
 	$SQL_VERSION -> {driver} = $driver_name;
 
 	delete $INC {"Eludia/SQL/${driver_name}.pm"};
+
+$time = __log_profilinig ($time, '  sql_reconnect: driver reloaded');
 
 	unless ($preconf -> {no_model_update}) {
 	
@@ -469,6 +478,8 @@ sub sql_reconnect {
 #		$preconf -> {no_model_update} = 1;
 		
 	}
+
+$time = __log_profilinig ($time, '  sql_reconnect: $model_update created');
 
 }   	
 
@@ -833,7 +844,143 @@ sub __log_sql_profilinig {
 }
 
 ################################################################################
+
+sub sql_extract_params {
+
+	my ($sql, @params) = @_;
+
+	return ($sql, @params) if $sql !~ /^\s*(SELECT|INSERT|UPDATE|DELETE)/i;
+
+	my $sql1 = '';
+	my @params1 = ();
+	my $i = 0;
+	my $flag = $sql =~ /SELECT/i ? 0 : 1;
+	my $flag1 = 1;
+
+	foreach my $token ( # stolen from http://search.cpan.org/src/IZUT/SQL-Tokenizer-0.09/lib/SQL/Tokenizer.pm
+
+		$sql =~ m{
+			(
+			    (?:>=|<=|==)            # >=, <= and == operators
+			    |
+			    [\(\),=;]               # punctuation (parenthesis, comma)
+			    |
+			    \'\'(?!\')              # empty single quoted string
+			    |
+			    \"\"(?!\"")             # empty double quoted string #"
+			    |
+			    ".*?(?:(?:""){1,}"|(?<!["\\])"(?!")|\\"{2})
+						    # anything inside double quotes, ungreedy
+			    |
+			    '.*?(?:(?:''){1,}'|(?<!['\\])'(?!')|\\'{2})
+						    # anything inside single quotes, ungreedy.
+			    |
+			    --[\ \t\S]*             # comments
+			    |
+			    \#[\ \t\S]*             # mysql style comments
+			    |
+			    /\*[\ \t\n\S]*?\*/      # C style comments
+			    |
+			    [^\s\(\),=;]+           # everything that doesn't matches with above
+			    |
+			    \n                      # newline
+			    |
+			    [\t\ ]+                 # any kind of white spaces
+			)
+		    }smxgo
+
+		) {
+
+
+		$token =~ s{\s+}{ }gsm;
+
+		if (
+			$token =~ /^--\s/
+			|| $token =~ /^\/\*\s*[^\+]/ || $token =~ /^\#*\s/
+		) {
+			$token = ' ';
+		}
+		else {
+		
+			$flag  = 1 if $token =~ /^FROM$/i;
+			$flag1 = 1 if $token =~ /^END$/i;
+			$flag  = 0 if $token =~ /^ORDER$/i || $token =~ /^GROUP$/i || $token =~ /^SELECT$/i;
+			$flag1 = 0 if $token =~ /^CASE$/i;
+			
+		
+			if ($token eq '?') {
+
+				push @params1, $params [$i ++];
+
+			}
+			elsif (
+
+				$token =~ /^0(\d+)$/
+
+			) {
+				$token = $1;
+			}
+			elsif (
+
+				($flag && $flag1) && (
+					$token =~ /^(\-?\d+)$/
+					|| $token =~ /^\'(.*?)\'$/
+				) 
+
+
+			) {
+
+				my $value = $1;
+				$value =~ s{\\\'}{\'}gsm;
+				push @params1, $value;
+				$token = '?';
+
+			}
+		
+		}
+
+		$token =~ /^\"(.*?)\"$/ or $token = uc $token;
+
+		$sql1 .= ' ';
+		$sql1 .= $token;
+		$sql1 .= ' ';
+
+	}
+
+	$sql1 =~ s{\s+$}{};
+	$sql1 =~ s{^\s+}{};
+	$sql1 =~ s{\s+}{ }g;
 	
+	$sql = $sql1;
+	
+	return ($sql1, @params1);
+
+}
+
+################################################################################
+
+sub sql_adjust_fake_filter {
+
+	my ($sql, $options) = @_;
+	
+	$options -> {fake} or return $sql;
+	
+	my $where    = 'WHERE ';
+	my $fake      = $_REQUEST {fake} || 0;
+	my $condition = $fake =~ /\,/ ? "IN ($fake)" : '=' . $fake;
+	
+	foreach my $table (split /\,/, $options -> {fake}) {
+		$where .= "$table.fake $condition AND ";
+	}	
+
+	$sql =~ s{where}{$where}i;
+	
+	return $sql;
+
+}
+
+################################################################################
+
 sub __log_request_profilinig {
 
 	my ($request_time) = @_;
