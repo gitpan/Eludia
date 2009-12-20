@@ -1,3 +1,9 @@
+commit 43be85cfb2eb6530c6938e9683942ac6489aa909
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Sun Dec 20 19:28:48 2009 +0300
+
+    logging the authentic bare %_REQUEST_VERBATIM
+
 commit 601b83634cb72134c1c933dc81849a5bf49709e6
 Author: Dmitry Ovsyanko <do@eludia.ru>
 Date:   Thu Dec 17 08:59:25 2009 +0300
