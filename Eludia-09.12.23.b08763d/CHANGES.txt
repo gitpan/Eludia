@@ -1,3 +1,70 @@
+commit b08763df28c4a26ec0557a128853b3db9c67c0c6
+Merge: e7d0000 7cffac4
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Wed Dec 23 20:37:13 2009 +0300
+
+    Merge branch 'master' of c:/buf/core
+
+commit 7cffac4307ba8d702ce127d7e11ffc168e862f74
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Tue Dec 22 15:13:23 2009 +0300
+
+    Profiling enlightenment
+
+commit 9613ef03f996165f34435592b2434c60669c78cf
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Tue Dec 22 14:51:24 2009 +0300
+
+    require_fresh: profiling fixed
+
+commit 3f86b13abb10b740e2d9e01d3c8e3debdb84a84f
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Tue Dec 22 14:17:02 2009 +0300
+
+    Oracle::sql_do_refresh_sessions: SQL optimized
+
+commit 2ef7e75a5472ba65547c718d6a9e9d9794625e0d
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Tue Dec 22 14:06:25 2009 +0300
+
+    A comment to fix syntax highlighting
+
+commit aeaaea1c53d497d882943241e652799cfc9580c1
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Tue Dec 22 13:05:08 2009 +0300
+
+    require_fresh: added support for split directories
+
+commit a072f29268b100df15b27cca16ec53b5b9832a20
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Tue Dec 22 11:43:32 2009 +0300
+
+    INC: the /lib/ dir is always in the path
+
+commit f72686d754b0e4a0ea00cda8749c0b68bab64d55
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Tue Dec 22 11:40:48 2009 +0300
+
+    INC sub for split directories
+
+commit 08ad7e4c2892cf90bccb510f4c923a2a506bfa42
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Dec 21 15:53:24 2009 +0300
+
+    using INC sub in FileDumpHash
+
+commit 87013a6b0475495b4925de6d37e56f405ce581c2
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Dec 21 15:12:02 2009 +0300
+
+    INC () sub is introduced
+
+commit e7d00006015aebd224cec9bdb5b6f35d07e48c2e
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Sun Dec 20 21:04:15 2009 +0300
+
+    POD cosmetics
+
 commit 43be85cfb2eb6530c6938e9683942ac6489aa909
 Author: Dmitry Ovsyanko <do@eludia.ru>
 Date:   Sun Dec 20 19:28:48 2009 +0300
