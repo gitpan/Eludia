@@ -1,3 +1,9 @@
+commit a3c31eb9ed8300dd8d7af4ca56e5ba40a7b5d41b
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Thu Dec 24 22:12:44 2009 +0300
+
+    FileDumpHash fixed for VIEW definitions (thanks KCE)
+
 commit 2697db973ae40d5ef3c8266f10d5b53a3c58a1e6
 Author: Dmitry Ovsyanko <do@eludia.ru>
 Date:   Thu Dec 24 21:58:21 2009 +0300
