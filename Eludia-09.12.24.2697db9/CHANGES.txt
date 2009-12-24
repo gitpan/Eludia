@@ -1,3 +1,9 @@
+commit 2697db973ae40d5ef3c8266f10d5b53a3c58a1e6
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Thu Dec 24 21:58:21 2009 +0300
+
+    TurboMilk::draw_input_cell: tabindex added (thanks KCE)
+
 commit b08763df28c4a26ec0557a128853b3db9c67c0c6
 Merge: e7d0000 7cffac4
 Author: Dmitry Ovsyanko <do@eludia.ru>
