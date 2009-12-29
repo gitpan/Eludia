@@ -1,3 +1,35 @@
+commit c064f8665fa0a56d85c54450966b0f5f6d3d8017
+Merge: 9561877 83533aa
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Tue Dec 29 20:43:34 2009 +0300
+
+    Merge branch 'master' of git@github.com:do-/eludia
+
+commit 9561877b5992153ab9e111f10047b8007feba925
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Tue Dec 29 17:12:42 2009 +0300
+
+    OpenSSO integration
+
+commit 2a227a7c3b0202f2048e40aaaba4c60ccfc0c341
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Dec 28 16:58:58 2009 +0300
+
+    FileDumpHash: caching fixed (for the case of split /lib/)
+
+commit 83533aadb0b40f65937be1a3a23fdad68879cfb9
+Merge: f0acca9 a3c31eb
+Author: Roman Lobzin <roman@cheby.ru>
+Date:   Mon Dec 28 15:44:47 2009 +0300
+
+    Merge branch 'master' of git://github.com/do-/eludia
+
+commit f0acca9ed67e0d9e922249b3966a984b48e27906
+Author: Roman Lobzin <roman@cheby.ru>
+Date:   Mon Dec 28 15:42:54 2009 +0300
+
+    XL print user label in <p></p>
+
 commit a3c31eb9ed8300dd8d7af4ca56e5ba40a7b5d41b
 Author: Dmitry Ovsyanko <do@eludia.ru>
 Date:   Thu Dec 24 22:12:44 2009 +0300
