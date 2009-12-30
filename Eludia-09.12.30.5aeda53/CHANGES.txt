@@ -1,3 +1,9 @@
+commit 5aeda535b8fa242df02303fcfb631ca135d31239
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Dec 30 17:52:07 2009 +0300
+
+    delete_fakes () relocated from handler to sql_do_insert
+
 commit c064f8665fa0a56d85c54450966b0f5f6d3d8017
 Merge: 9561877 83533aa
 Author: Dmitry Ovsyanko <do@eludia.ru>
