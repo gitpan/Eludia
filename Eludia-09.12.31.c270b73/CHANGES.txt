@@ -1,3 +1,9 @@
+commit c270b738318afeb70f5e71c10fdf44cac73c24c8
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Thu Dec 31 11:54:43 2009 +0300
+
+    {read_only} option for draw_table in TurboMilk
+
 commit 5aeda535b8fa242df02303fcfb631ca135d31239
 Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
 Date:   Wed Dec 30 17:52:07 2009 +0300

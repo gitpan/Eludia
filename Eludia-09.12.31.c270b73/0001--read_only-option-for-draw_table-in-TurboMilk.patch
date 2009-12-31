@@ -1,0 +1,38 @@
+From caf9eb8a13de82aaa405a3b504d51fc9e2466c09 Mon Sep 17 00:00:00 2001
+From: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date: Thu, 31 Dec 2009 11:54:43 +0300
+Subject: [PATCH] {read_only} option for draw_table in TurboMilk
+
+---
+ Eludia/Presentation/Skins/TurboMilk.pm |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/Eludia/Presentation/Skins/TurboMilk.pm b/Eludia/Presentation/Skins/TurboMilk.pm
+index 0ef1db8..f645fc0 100755
+--- a/Eludia/Presentation/Skins/TurboMilk.pm
++++ b/Eludia/Presentation/Skins/TurboMilk.pm
+@@ -2669,7 +2669,8 @@ sub draw_table {
+ 	foreach our $i (@$list) {
+ 		
+ 		foreach my $tr (@{$i -> {__trs}}) {
+-			
++		
++			my $has_href = $i -> {__href} && ($_REQUEST {__read_only} || !$_REQUEST {id} || $options -> {read_only});
+ 			
+ 			$html .= "<tr id='$$i{__tr_id}'";
+ 			
+@@ -2679,9 +2680,9 @@ sub draw_table {
+ 			}
+ 
+ 			$html .= '>';
+-			$html .= qq {<a target="$$i{__target}" href="$$i{__href}">} if $i -> {__href} && ($_REQUEST {__read_only} || !$_REQUEST {id});
++			$html .= qq {<a target="$$i{__target}" href="$$i{__href}">} if $has_href;
+ 			$html .= $tr;
+-			$html .= qq {</a>} if $i -> {__href} && ($_REQUEST {__read_only} || !$_REQUEST {id});
++			$html .= qq {</a>} if $has_href;
+ 			$html .= '</tr>';
+ 			
+ 		}
+-- 
+1.6.2.1217.gd7bc3
+
