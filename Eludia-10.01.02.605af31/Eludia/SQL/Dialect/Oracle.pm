@@ -23,6 +23,10 @@ sub sql_version {
 	sql_do ("ALTER SESSION SET nls_date_format      = '$conf->{db_date_format}'");
 	sql_do ("ALTER SESSION SET nls_timestamp_format = '$conf->{db_date_format}'");
 
+	$conf -> {db_sort}        ||= 'BINARY';
+
+	sql_do ("ALTER SESSION SET nls_sort             = '$conf->{db_sort}'");
+
 	my $systables = {};
 	foreach my $key (keys %{$conf -> {systables}}) {
 	    my $table = $conf -> {systables} -> {$key};
@@ -1116,7 +1120,7 @@ $pattern = $sql;
 
 my @order_by;
 
-if ($sql =~ /\s+ORDER\s+BY\s+(.*)/igsm) {
+if (!$conf -> {db_nulls_last} && $sql =~ /\s+ORDER\s+BY\s+(.*)/igsm) {
       
     @order_by = split ',',$1;
          

@@ -1,3 +1,33 @@
+commit 605af31074d25e834fffd2329ebb6042402f944b
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Sat Jan 2 02:07:46 2010 +0300
+
+    sql/Oracle: an explicit separate SELECT COUNT(*) without LEFT JOINs
+
+commit de62a735513184cd537d8eab194101ac6f96cf87
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Sat Jan 2 00:55:55 2010 +0300
+
+    Oracle: $conf -> {db_nulls_last}
+
+commit 5e08e643a33b4c6807bd47613013a565b133a59d
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Sat Jan 2 00:09:52 2010 +0300
+
+    sql/Oracle: FIRST_ROWS hint
+
+commit dc1c6063219121f533ee6de7eece27c02d43b17f
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Fri Jan 1 23:50:46 2010 +0300
+
+    sql/Oracle: adding senseless LIKE '%' filter to give index a chance
+
+commit 501a5399ee86f31db9e772734f69a0c44a1fba42
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Fri Jan 1 23:01:41 2010 +0300
+
+    Oracle: NLS_SORT
+
 commit c270b738318afeb70f5e71c10fdf44cac73c24c8
 Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
 Date:   Thu Dec 31 11:54:43 2009 +0300
