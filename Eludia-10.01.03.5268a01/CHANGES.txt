@@ -1,3 +1,9 @@
+commit 5268a01071c02902369cf5e01c6a03bd46f04d66
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Sun Jan 3 00:46:06 2010 +0300
+
+    sql/Oracle: LEFT JOINs are back in non-star queries
+
 commit 8ecad5d45818240d6ef3de5b8c8d553fc94a52d9
 Author: Dmitry Ovsyanko <do@eludia.ru>
 Date:   Sat Jan 2 22:59:46 2010 +0300
