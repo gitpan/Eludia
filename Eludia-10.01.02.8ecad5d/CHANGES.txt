@@ -1,3 +1,15 @@
+commit 8ecad5d45818240d6ef3de5b8c8d553fc94a52d9
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Sat Jan 2 22:59:46 2010 +0300
+
+    sql/Oracle: prevent from double mysql_to_oracle transformation
+
+commit 98df3f53ab2c2454b2c624cb0be2cc4320c774be
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Sat Jan 2 21:34:27 2010 +0300
+
+    sql/Oracle: the extra filter is dropped
+
 commit 605af31074d25e834fffd2329ebb6042402f944b
 Author: Dmitry Ovsyanko <do@eludia.ru>
 Date:   Sat Jan 2 02:07:46 2010 +0300

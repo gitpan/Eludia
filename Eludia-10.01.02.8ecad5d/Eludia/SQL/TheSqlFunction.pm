@@ -1017,23 +1017,13 @@ sub sql {
 				
 				$sql = mysql_to_oracle ($sql) if $conf -> {core_auto_oracle};
 
-				foreach ($order =~ /\w+\.\w+/g) {
-
-					my ($table, $column) = split /\./;
-
-					$DB_MODEL -> {tables} -> {$table} -> {columns} -> {$column} -> {TYPE_NAME} =~ /char/ or next;
-
-					$sql =~ s{WHERE\s+}{WHERE\n ${table}.${column} >= ' '\n AND };
-
-					last;
-
-				};
-			
 				$sql =~ s{SELECT}{SELECT /*+FIRST_ROWS*/};
+								
+				my $core_auto_oracle = delete $conf -> {core_auto_oracle};
 
 				my $st = sql_execute ($sql, @params);
 
-				my $n = 0;
+				$conf -> {core_auto_oracle} = $core_auto_oracle;
 				
 				$records = [];
 				
