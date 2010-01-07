@@ -70,6 +70,8 @@ sub get_item_of_ ($) {
 
 sub require_model {
 
+	my $core_was_ok = $model_update -> {core_ok};
+
 	sql_assert_core_tables ();
 	
 	our $DB_MODEL ||= {
@@ -85,11 +87,31 @@ sub require_model {
 
 		my %tables = ();
 
-		tie %tables, Eludia::Tie::FileDumpHash, {conf => $conf, path => \&INC};
+		tie %tables, Eludia::Tie::FileDumpHash, {conf => $conf, path => \&INC, package => current_package ()};
 
 		$DB_MODEL -> {tables} = \%tables;
 
-	}	
+	}
+	
+	$core_was_ok or require_scripts ();
+
+}
+
+################################################################################
+
+sub reverse_systables {
+
+	return if $conf -> {systables_reverse};
+
+	foreach my $key (keys %{$conf -> {systables}}) {
+	
+		my $value = $conf -> {systables} -> {$key};
+		
+		next if $key eq $value;
+	
+		$conf -> {systables_reverse} -> {$value} = $key;
+	
+	}					
 
 }
 
@@ -133,6 +155,14 @@ sub require_scripts_of_type ($) {
 			$file_name =~ /\.p[lm]$/ or next;
 			
 			my $script = {name => $`};
+			
+			if (-f "$dir/core") {
+			
+				reverse_systables ();
+				
+				$script -> {name} = $conf -> {systables_reverse} -> {$script -> {name}} || $script -> {name};
+
+			}
 
 			$script -> {path} = "$dir/$file_name";
 						

@@ -1,3 +1,57 @@
+commit b610f5f9f0068c8fae6757cfd8ea6f7cccddfffb
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Thu Jan 7 00:25:01 2010 +0300
+
+    get_user_sql: tz_offset is now by special request only
+
+commit ee5338d04fa6bd343522d05f04b112cd8fdd829c
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Thu Jan 7 00:17:00 2010 +0300
+
+    require_model fix: now it checks scripts if core table was not known to be created
+
+commit d2b8d45d3778374fe71878030cd8de9990b7e825
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Wed Jan 6 22:05:29 2010 +0300
+
+    core tables are moved to Model
+
+commit 62c22f6e9eec60eb4f827bde2887eb9311cc5b9f
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Wed Jan 6 15:01:05 2010 +0300
+
+    core table 'users' is transferred to Model
+
+commit aabcd0c83ce2c6b0ab62f64cea6f46c1b2223149
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Wed Jan 6 14:58:19 2010 +0300
+
+    FileDumpHash: added support for core tables
+
+commit 994e877d711ce3b6ebc5914e46de949618abe60b
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Wed Jan 6 12:34:59 2010 +0300
+
+    FileDumpHash: {off} option for columns, keys and other HASH valued components
+
+commit bf18197ce938fbc3e85789d3d637e80b7b09529d
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Wed Jan 6 12:25:57 2010 +0300
+
+    FileDumpHash: code cleanup
+
+commit 8a39cadc408f7819d56359c19378d08371958704
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Wed Jan 6 12:21:06 2010 +0300
+
+    FileDumpHash: off option for tables
+
+commit c39ff24538d7b534cb3446cf6fce77fb2609adef
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Wed Jan 6 12:18:23 2010 +0300
+
+    - FileDumpHash: application context
+
 commit 5268a01071c02902369cf5e01c6a03bd46f04d66
 Author: Dmitry Ovsyanko <do@eludia.ru>
 Date:   Sun Jan 3 00:46:06 2010 +0300
