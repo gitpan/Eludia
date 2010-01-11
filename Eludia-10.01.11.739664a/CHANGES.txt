@@ -1,3 +1,46 @@
+commit 739664a6bb2f1b1223fea32f65c9f4d7cf1c6142
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 11 16:44:57 2010 +0300
+
+    Model: added support for {name}-indexed & spanned data
+
+commit bee97e20d048fc53ed1174b2fbfb2fb42528a5d6
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 11 14:37:05 2010 +0300
+
+    OpenSSO: purging cookies for all possible domains
+
+commit a5c4a3f0000cbde27df31ed46066dc59d1433000
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 11 13:04:51 2010 +0300
+
+    OpenSSO: added support for $_COOKIE {redirect_params}
+
+commit f7ad848ff37239b1652789c2e0e9dd62f2ce24ce
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 11 10:20:13 2010 +0300
+
+    OpenSSO fix: deleting old cookie
+
+commit 03f151de2898855f792024013fa7b217f5878051
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 11 09:41:12 2010 +0300
+
+    sql/Oracle fixes (LIMIT was incorrectly handled since dc1c6063219121f533ee6de7eece27c02d43b17f)
+
+commit fabf0d8b4af1ef86f02c269a41e05708ca574f70
+Merge: f2b075c b610f5f
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Fri Jan 8 19:33:40 2010 +0300
+
+    Merge branch 'master' of git://github.com/do-/eludia
+
+commit f2b075c07a90331916171afdf6a4c6776a88aa62
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Fri Jan 8 19:29:48 2010 +0300
+
+    move MySQL db_default_storage_engine option to wish_to_adjust_options_for_tables
+
 commit b610f5f9f0068c8fae6757cfd8ea6f7cccddfffb
 Author: Dmitry Ovsyanko <do@eludia.ru>
 Date:   Thu Jan 7 00:25:01 2010 +0300

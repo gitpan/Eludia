@@ -48,8 +48,29 @@ warn Dumper ($token);
 	unless ($token) {
 	
 		$r -> status (302);
+
+		my ($head, @tail) = split /\./, $ENV {HTTP_HOST};
+
+		my $domain = '';
+						
+		foreach my $part (reverse @tail) {
+			
+			$domain = '.' . $part . $domain;
+
+			set_cookie (
+			
+				-name    => $preconf -> {_} -> {opensso_cookie_name},
+ 				-expires =>  '-1M',
+				-value   => '',
+				-path    => '/',
+				-domain  => $domain,
+				
+			);
+	
+			
+		}
 		
-		$r -> headers_out -> {'Location'} = $preconf -> {ldap} -> {opensso} . "/UI/Login?goto=http://$ENV{HTTP_HOST}/";
+		$r -> headers_out -> {'Location'}   = $preconf -> {ldap} -> {opensso} . "/UI/Login?goto=http://$ENV{HTTP_HOST}/";
 		
 		send_http_header ();
 		
@@ -146,8 +167,17 @@ warn Dumper ($user);
 		start_session (sql (users => $user, ['login']));
 
 	}	
+	
+	if ($_COOKIE {redirect_params}) {
 
-	delete $_REQUEST {type};
+		$_REQUEST {type}   = 'logon';
+		$_REQUEST {action} = 'execute';
+
+		recalculate_logon ();
+		
+		redirect ({});
+	
+	}
 
 warn Dumper (\%_REQUEST);
 
