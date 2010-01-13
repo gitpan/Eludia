@@ -1,3 +1,15 @@
+commit 5ddfa060d654f9bac63892691d12023f8dcfc2ee
+Author: Pavel Koudriavtsev <pik@cheby.ru>
+Date:   Wed Jan 13 13:23:05 2010 +0300
+
+    sub INC renamed to _INC
+
+commit 816dd3d3fc7148f611284a8053b0e1843369fe50
+Author: Pavel Koudriavtsev <pik@cheby.ru>
+Date:   Wed Jan 13 13:22:36 2010 +0300
+
+    vld_date(): check date correctness
+
 commit 739664a6bb2f1b1223fea32f65c9f4d7cf1c6142
 Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
 Date:   Mon Jan 11 16:44:57 2010 +0300
