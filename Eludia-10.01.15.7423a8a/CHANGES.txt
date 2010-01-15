@@ -1,3 +1,40 @@
+commit 7423a8ae995903be880d6669f50628107f08933b
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Fri Jan 15 10:26:52 2010 +0300
+
+    OpenSSO fixed for HTTP_HOST with explicit port
+
+commit b17e4e37807117a280435ef5713e3ada3ccca14c
+Merge: aa8ba3b 289e79d
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Fri Jan 15 14:22:22 2010 +0300
+
+    Merge branch 'master' of git://github.com/do-/eludia
+
+commit aa8ba3b1209e62118f94339e5869c70efe4145cc
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Fri Jan 15 11:20:18 2010 +0300
+
+    renaming variables
+
+commit 9407586d1d9057070974979d5802e80869804f23
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Fri Jan 15 11:17:54 2010 +0300
+
+    magic bugfix: Presentation.pm sub's was not overloaded by Config.pm
+
+commit 289e79d71ea95ba9781cec8dea802608d56c25fe
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Thu Jan 14 12:00:25 2010 +0300
+
+    TheSqlFunction: removed AS keyword for table aliases
+
+commit efce7235b5b7e4517e5f46ac3575669fc65a542d
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Thu Jan 14 09:37:56 2010 +0300
+
+    draw_form: {label_edit} option is working now
+
 commit 5ddfa060d654f9bac63892691d12023f8dcfc2ee
 Author: Pavel Koudriavtsev <pik@cheby.ru>
 Date:   Wed Jan 13 13:23:05 2010 +0300

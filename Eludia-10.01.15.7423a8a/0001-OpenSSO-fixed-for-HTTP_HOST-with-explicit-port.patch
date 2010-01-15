@@ -1,0 +1,30 @@
+From d588b50b1581919d2b51aa7ac6daa6640aee70b8 Mon Sep 17 00:00:00 2001
+From: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date: Fri, 15 Jan 2010 10:26:52 +0300
+Subject: [PATCH] OpenSSO fixed for HTTP_HOST with explicit port
+
+---
+ Eludia/Content/Auth/OpenSSO.pm |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
+
+diff --git a/Eludia/Content/Auth/OpenSSO.pm b/Eludia/Content/Auth/OpenSSO.pm
+index 4342117..e7413ba 100644
+--- a/Eludia/Content/Auth/OpenSSO.pm
++++ b/Eludia/Content/Auth/OpenSSO.pm
+@@ -48,8 +48,12 @@ warn Dumper ($token);
+ 	unless ($token) {
+ 	
+ 		$r -> status (302);
++		
++		my $host = $ENV {HTTP_HOST};
++		
++		$host =~ s{\:\d+$}{};
+ 
+-		my ($head, @tail) = split /\./, $ENV {HTTP_HOST};
++		my ($head, @tail) = split /\./, $host;
+ 
+ 		my $domain = '';
+ 						
+-- 
+1.6.2.1217.gd7bc3
+
