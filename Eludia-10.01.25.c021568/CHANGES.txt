@@ -1,3 +1,92 @@
+commit c021568bf3f32f28c4cecc439283d60c6165362b
+Merge: 941b75f d2ed0b4
+Author: Dmitry Ovsyanko <do@eludia.ru>
+Date:   Mon Jan 25 21:11:42 2010 +0300
+
+    Merge branch 'master' of git@github.com:do-/eludia
+
+commit 941b75f43cb147ba943c85615faaf368775c6cee
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 25 16:48:50 2010 +0300
+
+    wish table_data: {soft_delete} option introduced
+
+commit b662d1fb7d745b7f3cd43098fc55db83bb15f7d5
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 25 14:19:54 2010 +0300
+
+    wish: no more early exit on empty item list
+
+commit c4487bab42bb4718e81c7f04ef3b9e79582fcd2a
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Jan 20 12:56:09 2010 +0300
+
+    OpenSSO: transferring REQUEST_URI
+
+commit cb705e1052ca584b3ad750bc8be569b53244e1a5
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Jan 20 12:55:16 2010 +0300
+
+    log v2: type adjusted
+
+commit d2ed0b47a20e4548dae4c82b1f02a4685f2a9a82
+Merge: 94797bb 6bbd936
+Author: root <root@oracle10g.(none)>
+Date:   Fri Jan 22 15:38:27 2010 +0300
+
+    Merge branch 'master' of git://github.com/do-/eludia
+
+commit 94797bbf23166e1517054aba4dd2c158e4ca2e04
+Author: root <root@oracle10g.(none)>
+Date:   Fri Jan 22 15:38:08 2010 +0300
+
+    fix sql_select_loop
+
+commit e7774fc566c6c15aff0f807be0459018de3d93e8
+Author: root <root@oracle10g.(none)>
+Date:   Fri Jan 22 15:37:44 2010 +0300
+
+    sql_do_update: check duplicate 'fake' parameter
+
+commit 2ff182c7ab498abce28e4b6657dfed8a96959fb2
+Author: root <root@oracle10g.(none)>
+Date:   Fri Jan 22 15:32:49 2010 +0300
+
+    allow ;\n in Model files
+
+commit 6bbd936a133a586505cfb387eedcbba1c7a59e25
+Merge: c04ef86 347ee20
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Tue Jan 19 18:06:24 2010 +0300
+
+    Merge branch 'master' of git://github.com/do-/eludia
+
+commit c04ef86d6fdeaf77bbcd34000290cbd374a5d5a0
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Tue Jan 19 18:04:50 2010 +0300
+
+    Queries:
+    - type => banner - banner
+    - no_column - hide show params
+
+commit 347ee20e708d58b79b5becde6375bfaac677cb19
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 18 15:01:55 2010 +0300
+
+    log v2 fix: setup JSON
+
+commit a050604426a3c31926c70b2ad4d5b5d6c8c13d6d
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 18 12:10:27 2010 +0300
+
+    log v2
+
+commit 3f68c9dcd0cca22faad6228a72472c03dcf31f15
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Mon Jan 18 10:49:03 2010 +0300
+
+    - log module separated; mac module deleted
+
 commit 7423a8ae995903be880d6669f50628107f08933b
 Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
 Date:   Fri Jan 15 10:26:52 2010 +0300
