@@ -3,7 +3,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile (
 
     'NAME'		=> 'Eludia',
-    'VERSION'	        => "10.01.25.c021568",
+    'VERSION'	        => "10.01.27.cd6c3e5",
     'PREREQ_PM'		=> {
 	'DBI'			=> '1.21',
 	'Number::Format'	=> '1.45',

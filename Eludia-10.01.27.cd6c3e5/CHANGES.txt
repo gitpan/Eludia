@@ -1,3 +1,33 @@
+commit cd6c3e592e525ba9b2a15443a2a168734e02cb49
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Jan 27 17:05:31 2010 +0300
+
+    log v2: href optimized
+
+commit 1075e14a4cec8a0be096fb0d13093d9baea2d48d
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Jan 27 16:47:19 2010 +0300
+
+    log v2: __form_checkboxes expanding; brackets dropped
+
+commit 53b160f6840179e4d242c2ad4609d1ed80dcfdf3
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Jan 27 16:24:09 2010 +0300
+
+    log v2: cleaning up senseless parameters
+
+commit 0acf5f675a39743a3e3768ebf33ca81f181c01fc
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Jan 27 12:11:47 2010 +0300
+
+    file_icon introduced (as of now, TurboMilk only)
+
+commit d7ace9ca6ded030c7e206903736d8d40eb896c3f
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Jan 27 10:59:35 2010 +0300
+
+    OpenSSO: [cookie] domain independence
+
 commit c021568bf3f32f28c4cecc439283d60c6165362b
 Merge: 941b75f d2ed0b4
 Author: Dmitry Ovsyanko <do@eludia.ru>
