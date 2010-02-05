@@ -76,7 +76,7 @@ warn Dumper ($token);
 			
 		}
 
-		$r -> headers_out -> {'Location'}   = $preconf -> {ldap} -> {opensso} . "/UI/Login?goto=http://$ENV{HTTP_HOST}$ENV{REQUEST_URI}";
+		$r -> headers_out -> {'Location'}   = $preconf -> {ldap} -> {opensso} . "/UI/Login?goto=" . uri_escape ("http://$ENV{HTTP_HOST}$ENV{REQUEST_URI}");
 		
 		send_http_header ();
 		
@@ -180,6 +180,8 @@ warn Dumper ($user);
 		$_REQUEST {action} = 'execute';
 
 		recalculate_logon ();
+		
+		delete $_REQUEST {action};
 		
 		redirect ({});
 	

@@ -1,3 +1,51 @@
+commit 300e43d7b58e378089596127a67d4a9a52e16684
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Fri Feb 5 16:39:21 2010 +0300
+
+    TheSqlFunction: pagination fix for Oracle
+
+commit 3f0e69730b6e4e581b6800724bc9da5bea0da26e
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Fri Feb 5 15:06:55 2010 +0300
+
+    OpenSSO: parameters cleanup
+
+commit 49084e8cccd0a74ea6a845b462b3736e70f927b9
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Fri Feb 5 15:06:12 2010 +0300
+
+    log v2: a fix for splitted params
+
+commit 3e2f52b3a060725c876dd651d0ae06b925836a3f
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Feb 3 17:47:29 2010 +0300
+
+    OpenSSO fix: uri_escape for 'goto' URL
+
+commit 0f19549039a38a5fff16ed90f0411b49962a1202
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Fri Jan 29 17:59:55 2010 +0300
+
+    log v2: finite 'parameter' field
+
+commit 6bfa5530b446b237ad19b5f878735ab9021616be
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Thu Jan 28 16:40:49 2010 +0300
+
+    _INC is used in fill_in_template
+
+commit 77c33ff78c7fb6c355e39f14740ac96ebce0b359
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Thu Jan 28 14:20:35 2010 +0300
+
+    TurboMilk: MSIE 8+
+
+commit 9e43291e5f9ae10e69abeadbd7308e7cd66c4035
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Thu Jan 28 14:10:27 2010 +0300
+
+    syntax highlighting fix
+
 commit cd6c3e592e525ba9b2a15443a2a168734e02cb49
 Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
 Date:   Wed Jan 27 17:05:31 2010 +0300
