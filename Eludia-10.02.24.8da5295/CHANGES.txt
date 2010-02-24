@@ -1,3 +1,22 @@
+commit 8da52959ee7057e8ba4e85f1628cfceabde0638a
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Wed Feb 24 17:30:06 2010 +0300
+
+    CGISimple.pm: for multivalued parameters, the _last_ value is taken into account.
+
+commit 81396c67885d7d51a175644fe66458f30208ea99
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Wed Feb 24 16:15:45 2010 +0300
+
+    COLUMN_SIZE for VARBINARY (RAW) fields
+
+commit 07b68986bf1a86539df9965e8d4d503ba27c7d79
+Merge: 0f0aa1a 300e43d
+Author: root <root@cheby.ru>
+Date:   Mon Feb 8 12:14:27 2010 +0300
+
+    Merge branch 'master' of git://github.com/do-/eludia
+
 commit 300e43d7b58e378089596127a67d4a9a52e16684
 Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
 Date:   Fri Feb 5 16:39:21 2010 +0300
@@ -15,6 +34,19 @@ Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
 Date:   Fri Feb 5 15:06:12 2010 +0300
 
     log v2: a fix for splitted params
+
+commit 0f0aa1a0c048f47687096606cdf920d29d6caa5d
+Merge: f66f8d5 3e2f52b
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Fri Feb 5 15:39:29 2010 +0300
+
+    Merge branch 'master' of git://github.com/do-/eludia
+
+commit f66f8d5acf8c489e51f81d344998fccebeea2084
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Fri Feb 5 15:38:45 2010 +0300
+
+    static field as detail fix
 
 commit 3e2f52b3a060725c876dd651d0ae06b925836a3f
 Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
