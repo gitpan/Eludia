@@ -1,3 +1,22 @@
+commit c8e359a462defff8412f93a29484ab9b54fa14d0
+Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
+Date:   Sat Feb 27 15:02:08 2010 +0300
+
+    handler: draw_error_page for 'require' time errors
+
+commit c99f777321e085765668f1779c24fe392f7feb61
+Merge: 6af9e21 8da5295
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Sat Feb 27 13:55:18 2010 +0300
+
+    Merge branch 'master' of git://github.com/do-/eludia
+
+commit 6af9e21c17cd3258ecc2adb33386484895974372
+Author: Pavel Koudriavtsev <root@cheby.ru>
+Date:   Sat Feb 27 13:55:08 2010 +0300
+
+    Clear new line symbols in draw_form_field_multi_select
+
 commit 8da52959ee7057e8ba4e85f1628cfceabde0638a
 Author: Dmitry Ovsyanko <Dmitry.Ovsyanko@mts.ru>
 Date:   Wed Feb 24 17:30:06 2010 +0300
